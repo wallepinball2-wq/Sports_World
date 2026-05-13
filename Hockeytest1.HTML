@@ -2417,23 +2417,39 @@ function tradeTeamName(){ return trade.team || (state.others[0]&&state.others[0]
 
 function tradePlayerOVRValue(players){
   return players.reduce((s, id) => {
-    // Find player in my roster or any other team's roster
+    // 1. Find the player
     const p = state.myTeam.roster.find(x => x.id === id) || 
               state.others.flatMap(t => t.roster).find(x => x.id === id);
     if (!p) return s;
 
-    let val = p.ovr;
-    // THE STAR BUMP: Elite players (88+) get an exponential value boost
-    if (p.ovr >= 88) {
-      val += Math.pow(p.ovr - 86, 6); 
+    // 2. THE BASE SCALE: Every point counts
+    // We use a base value of OVR, but we multiply it by a "Growth Factor"
+    // An 81 will now naturally be worth more than an 80 because of the exponent.
+    let val = Math.pow(p.ovr / 10, 2.5); 
+
+    // 3. THE PRODUCTION BONUS: Stats/Points
+    // Adds value based on their current season points.
+    if (p.stats && p.stats.pts) {
+      val += (p.stats.pts / 5); 
     }
-    // PROSPECT BONUS: 22 or younger with 78+ OVR
-    if (p.age <= 22 && p.ovr >= 78) val += 7;
+
+    // 4. THE PROJECTION BONUS: Role & Potential
+    // "Franchise" and "Elite" players get a flat bump for their 'name value'
+    if (p.role && p.role.includes('Franchise')) val += 30;
+    if (p.role && p.role.includes('Elite')) val += 15;
+
+    // 5. THE STAR BUMP: Extra weight for the truly elite (90+)
+    // This makes the gap between a 90 and a 92 feel massive.
+    if (p.ovr >= 90) {
+      val += Math.pow(p.ovr - 89, 2);
+    }
+
+    // 6. YOUTH BONUS: Prospects are "Gold"
+    if (p.age <= 22 && p.ovr >= 75) val += 10;
 
     return s + val;
   }, 0);
 }
-
 function tradePickValue(picks){ 
   return picks.reduce((s, pk) => s + pickValueScore(pk), 0); 
 }
