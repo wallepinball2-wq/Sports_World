@@ -933,6 +933,18 @@ var PHASES = {
   FREE_AGENCY:    'Free Agency',
   OFFSEASON:      'Offseason',
 };
+const SEASON_MONTHS = [
+  { name:'October',   days:31 },
+  { name:'November',  days:30 },
+  { name:'December',  days:31 },
+  { name:'January',   days:31 },
+  { name:'February',  days:28 },
+  { name:'March',     days:31 },
+  { name:'April',     days:30 },
+];
+// Game days per week: Tue=2, Thu=4, Sat=6 (0=Sun)
+const GAME_DAYS = [2, 4, 6];
+const TRADE_DEADLINE = { month:'February', day:28 };
 
 class Contract {
   constructor(capPct, years){
@@ -3281,18 +3293,6 @@ if (typeof incrementGP === 'undefined') {
 // ----------------------------------------------------------------
 // CALENDAR — date-based season from Oct to Apr
 // ----------------------------------------------------------------
-const SEASON_MONTHS = [
-  { name:'October',   days:31 },
-  { name:'November',  days:30 },
-  { name:'December',  days:31 },
-  { name:'January',   days:31 },
-  { name:'February',  days:28 },
-  { name:'March',     days:31 },
-  { name:'April',     days:30 },
-];
-// Game days per week: Tue=2, Thu=4, Sat=6 (0=Sun)
-const GAME_DAYS = [2, 4, 6];
-const TRADE_DEADLINE = { month:'February', day:28 };
 
 function freshCalendar(year){
   return {
