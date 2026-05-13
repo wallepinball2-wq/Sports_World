@@ -2832,11 +2832,9 @@ function assignPlusMinus(team, goalsFor, goalsAgainst){
   });
 }
 
-function incrementGP(team){
-  team.roster.forEach(p=>{
-    if(!p.stats) p.stats = freshStats(p.pos);
-    p.stats.gp = (p.stats.gp||0) + 1;
-  });
+function incrementGP(team) {
+  // Only give GP to skaters. Goalies are handled by the pickGoalie logic.
+  team.roster.filter(p => p.pos !== 'G').forEach(p => getStatLine(p).gp++);
 }
 
 function weightedPick(players, attr){
@@ -3202,45 +3200,46 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   const oppAvg = 4 + Math.max(0,(oppStr-myStr)*0.08);
   let mg = Math.round(Math.max(0, myAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
   let og = Math.round(Math.max(0, oppAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
-  
   if(mg===og){ if(Math.random()<0.5) mg++; else og++; }
-  
+
   let result;
   if(mg>og){ myTeam.w++; result='W'; }
-  else { myTeam.l++; oppTeam.w++; result='L'; } // Simplified for this block
+  else if(mg<og){ myTeam.l++; oppTeam.w++; result='L'; }
+  else { myTeam.otl++; oppTeam.w++; result='OTL'; }
 
   const isMyHome = myTeam.name===state.myTeam.name;
   const isMyAway = oppTeam.name===state.myTeam.name;
-  
+
   assignGoalsToTeam(myTeam, mg, isMyHome);
   assignGoalsToTeam(oppTeam, og, isMyAway);
   assignPlusMinus(myTeam, mg, og);
   assignPlusMinus(oppTeam, og, mg);
 
-  // FIX PART 1: Only increment GP for Skaters in this function
-  myTeam.roster.filter(p => p.pos !== 'G').forEach(p => getStatLine(p).gp = (getStatLine(p).gp || 0) + 1);
-  oppTeam.roster.filter(p => p.pos !== 'G').forEach(p => getStatLine(p).gp = (getStatLine(p).gp || 0) + 1);
+  // --- FIX 1: ONLY INCREMENT GP FOR SKATERS ---
+  myTeam.roster.forEach(p => { if(p.pos !== 'G') getStatLine(p).gp = (getStatLine(p).gp||0)+1; });
+  oppTeam.roster.forEach(p => { if(p.pos !== 'G') getStatLine(p).gp = (getStatLine(p).gp||0)+1; });
 
+  // --- FIX 2: PICK THE ACTUAL GOALIE WHO PLAYED ---
   function pickGoalie(team){
-    const gs = team.roster.filter(p=>p.pos==='G').sort((a,b) => b.ovr - a.ovr);
+    const gs = team.roster.filter(p=>p.pos==='G');
     if(!gs.length) return null;
-    const useStarter = Math.random() * 100 < 75; // 75% chance for starter
+    const useStarter = Math.random() * 100 < 75; // 75% start rate
     return (useStarter || gs.length === 1) ? gs[0] : gs[1];
   }
 
   const myG = pickGoalie(myTeam);
   const oppG = pickGoalie(oppTeam);
 
-  // FIX PART 2: Manually add GP, Wins, and Losses to ONLY the goalie who played
+  // --- FIX 3: ONLY GIVE THE STARTING GOALIE A GAME PLAYED ---
   if(myG){ 
-      let s = getStatLine(myG);
-      s.gp = (s.gp || 0) + 1; // Now goalie GP only goes up if they are picked!
-      if(mg > og) s.w = (s.w || 0) + 1; else s.l = (s.l || 0) + 1; 
+    const s = getStatLine(myG);
+    s.gp = (s.gp||0) + 1; 
+    if(mg > og) s.w = (s.w||0)+1; else s.l = (s.l||0)+1; 
   }
   if(oppG){ 
-      let s = getStatLine(oppG);
-      s.gp = (s.gp || 0) + 1; 
-      if(og > mg) s.w = (s.w || 0) + 1; else s.l = (s.l || 0) + 1; 
+    const s = getStatLine(oppG);
+    s.gp = (s.gp||0) + 1;
+    if(og > mg) s.w = (s.w||0)+1; else s.l = (s.l||0)+1; 
   }
 
   return { result, mg, og, opp: oppTeam.name };
