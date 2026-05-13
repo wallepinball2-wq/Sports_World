@@ -2832,15 +2832,19 @@ function assignPlusMinus(team, goalsFor, goalsAgainst){
   });
 }
 
-function incrementGP(team) {
-  // Only increment GP for skaters here. 
-  // Goalies are handled individually in simOneGame to ensure 
-  // only the starter gets credited.
-  team.roster.filter(p => p.pos !== 'G').forEach(p => {
-    const s = getStatLine(p);
+const myG = pickGoalie(myTeam);
+  const oppG = pickGoalie(oppTeam);
+
+  if(myG){ 
+    let s = getStatLine(myG);
+    s.gp = (s.gp || 0) + 1; // This +1 is the ONLY time a goalie should get GP
+    if(result==='W') s.w=(s.w||0)+1; else s.l=(s.l||0)+1; 
+  }
+  if(oppG){ 
+    let s = getStatLine(oppG);
     s.gp = (s.gp || 0) + 1;
-  });
-}
+    if(result!=='W') s.w=(s.w||0)+1; else s.l=(s.l||0)+1; 
+  }
 
 function weightedPick(players, attr){
   if(!players.length) return null;
