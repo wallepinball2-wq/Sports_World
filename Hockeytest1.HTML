@@ -2425,7 +2425,7 @@ function tradePlayerOVRValue(players){
     let val = p.ovr;
     // THE STAR BUMP: Elite players (88+) get an exponential value boost
     if (p.ovr >= 88) {
-      val += Math.pow(p.ovr - 86, 1.8); 
+      val += Math.pow(p.ovr - 86, 6); 
     }
     // PROSPECT BONUS: 22 or younger with 78+ OVR
     if (p.age <= 22 && p.ovr >= 78) val += 7;
