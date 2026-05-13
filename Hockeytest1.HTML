@@ -3224,22 +3224,22 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   assignPlusMinus(myTeam, mg, og);
   assignPlusMinus(oppTeam, og, mg);
 
-  // --- FIX 1: ONLY INCREMENT GP FOR SKATERS ---
-  myTeam.roster.forEach(p => { if(p.pos !== 'G') getStatLine(p).gp = (getStatLine(p).gp||0)+1; });
-  oppTeam.roster.forEach(p => { if(p.pos !== 'G') getStatLine(p).gp = (getStatLine(p).gp||0)+1; });
+  // SKATERS GP: Only give +1 to non-goalies
+  myTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
+  oppTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
 
-  // --- FIX 2: PICK THE ACTUAL GOALIE WHO PLAYED ---
+  // GOALIE SELECTION
   function pickGoalie(team){
-    const gs = team.roster.filter(p=>p.pos==='G');
+    const gs = team.roster.filter(p=>p.pos==='G').sort((a,b)=>b.ovr - a.ovr);
     if(!gs.length) return null;
-    const useStarter = Math.random() * 100 < 75; // 75% start rate
+    const useStarter = Math.random() * 100 < 75;
     return (useStarter || gs.length === 1) ? gs[0] : gs[1];
   }
 
   const myG = pickGoalie(myTeam);
   const oppG = pickGoalie(oppTeam);
 
-  // --- FIX 3: ONLY GIVE THE STARTING GOALIE A GAME PLAYED ---
+  // ONLY THE STARTER GETS GP
   if(myG){ 
     const s = getStatLine(myG);
     s.gp = (s.gp||0) + 1; 
@@ -3252,6 +3252,11 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   }
 
   return { result, mg, og, opp: oppTeam.name };
+}
+
+// ADD THIS SMALL BLOCK BELOW IT TO STOP THE UI FROM BREAKING
+if (typeof incrementGP === 'undefined') {
+    window.incrementGP = function(team) { /* Already handled in simOneGame */ };
 }
 
 // ================================================================
