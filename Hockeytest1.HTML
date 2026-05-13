@@ -910,6 +910,7 @@ function showNavGroup(group){
 </div>
 
 <script>
+
 // ---- League & Contract System ----
 const league = {
   salaryCap: 104,          // total cap ceiling in $M
@@ -919,6 +920,18 @@ const league = {
   get cap(){ return this.salaryCap; },
   get capFloor(){ return Math.round(this.salaryCap * this.capFloorPct / 100 * 100) / 100; }, // floor in $M
   get capFloorPct_(){ return this.capFloorPct; }
+};
+
+// Season phases in order
+var PHASES = {
+  PRESEASON:      'Preseason',
+  REGULAR_SEASON: 'Regular Season',
+  TRADE_DEADLINE: 'Trade Deadline',
+  PLAYOFFS:       'Playoffs',
+  DRAFT:          'Draft',
+  RESIGN:         'Re-Signing',
+  FREE_AGENCY:    'Free Agency',
+  OFFSEASON:      'Offseason',
 };
 
 class Contract {
@@ -3264,17 +3277,6 @@ if (typeof incrementGP === 'undefined') {
 // Master controller for all league flow and phase transitions.
 // ================================================================
 
-// Season phases in order
-var PHASES = {
-  PRESEASON:      'Preseason',
-  REGULAR_SEASON: 'Regular Season',
-  TRADE_DEADLINE: 'Trade Deadline',
-  PLAYOFFS:       'Playoffs',
-  DRAFT:          'Draft',
-  RESIGN:         'Re-Signing',
-  FREE_AGENCY:    'Free Agency',
-  OFFSEASON:      'Offseason',
-};
 
 // ----------------------------------------------------------------
 // CALENDAR — date-based season from Oct to Apr
