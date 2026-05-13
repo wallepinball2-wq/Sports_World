@@ -946,6 +946,33 @@ const SEASON_MONTHS = [
 const GAME_DAYS = [2, 4, 6];
 const TRADE_DEADLINE = { month:'February', day:28 };
 
+const POTENTIAL_TIERS = {
+  F: [
+    { role:'Franchise Forward',  ovrRange:[93,99], weight:1   }, // ~1-2 per league
+    { role:'Elite Forward',      ovrRange:[88,92], weight:4   }, // ~8-12 league-wide
+    { role:'Top 6 Forward',      ovrRange:[83,87], weight:14  }, // solid contributors
+    { role:'Top 9 Forward',      ovrRange:[78,82], weight:28  }, // most common good player
+    { role:'Bottom 6 Forward',   ovrRange:[73,78], weight:32  }, // depth/role players
+    { role:'Depth Forward',      ovrRange:[65,73], weight:21  }, // AHL/fringe
+  ],
+  D: [
+    { role:'Franchise Defenseman',   ovrRange:[93,99], weight:1   },
+    { role:'Elite Defenseman',       ovrRange:[88,92], weight:4   },
+    { role:'Top Pair Defenseman',    ovrRange:[83,87], weight:14  },
+    { role:'Top 4 Defenseman',       ovrRange:[78,82], weight:28  },
+    { role:'Bottom Pair Defenseman', ovrRange:[73,78], weight:32  },
+    { role:'Depth Defenseman',       ovrRange:[65,73], weight:21  },
+  ],
+  G: [
+    // Goalies are rare — most teams have 1 true starter, backup is notably weaker
+    { role:'Franchise Goalie', ovrRange:[93,99], weight:1   }, // generational rarity
+    { role:'Elite Goalie',     ovrRange:[87,92], weight:3   }, // ~5-8 league-wide
+    { role:'Starting Goalie',  ovrRange:[80,86], weight:18  }, // 1 per team typical
+    { role:'Backup Goalie',    ovrRange:[72,79], weight:40  }, // clearly weaker
+    { role:'Depth Goalie',     ovrRange:[62,72], weight:38  }, // AHL/emergency
+  ],
+};
+
 class Contract {
   constructor(capPct, years){
     this.capPct = capPct;       // percentage of salary cap e.g. 8.5
@@ -3782,32 +3809,7 @@ function renderPlayoffs(){
 // Most players are middle-tier; superstars are memorable
 // Goalies: heavily restricted — most teams have 1 true starter
 // ----------------------------------------------------------------
-const POTENTIAL_TIERS = {
-  F: [
-    { role:'Franchise Forward',  ovrRange:[93,99], weight:1   }, // ~1-2 per league
-    { role:'Elite Forward',      ovrRange:[88,92], weight:4   }, // ~8-12 league-wide
-    { role:'Top 6 Forward',      ovrRange:[83,87], weight:14  }, // solid contributors
-    { role:'Top 9 Forward',      ovrRange:[78,82], weight:28  }, // most common good player
-    { role:'Bottom 6 Forward',   ovrRange:[73,78], weight:32  }, // depth/role players
-    { role:'Depth Forward',      ovrRange:[65,73], weight:21  }, // AHL/fringe
-  ],
-  D: [
-    { role:'Franchise Defenseman',   ovrRange:[93,99], weight:1   },
-    { role:'Elite Defenseman',       ovrRange:[88,92], weight:4   },
-    { role:'Top Pair Defenseman',    ovrRange:[83,87], weight:14  },
-    { role:'Top 4 Defenseman',       ovrRange:[78,82], weight:28  },
-    { role:'Bottom Pair Defenseman', ovrRange:[73,78], weight:32  },
-    { role:'Depth Defenseman',       ovrRange:[65,73], weight:21  },
-  ],
-  G: [
-    // Goalies are rare — most teams have 1 true starter, backup is notably weaker
-    { role:'Franchise Goalie', ovrRange:[93,99], weight:1   }, // generational rarity
-    { role:'Elite Goalie',     ovrRange:[87,92], weight:3   }, // ~5-8 league-wide
-    { role:'Starting Goalie',  ovrRange:[80,86], weight:18  }, // 1 per team typical
-    { role:'Backup Goalie',    ovrRange:[72,79], weight:40  }, // clearly weaker
-    { role:'Depth Goalie',     ovrRange:[62,72], weight:38  }, // AHL/emergency
-  ],
-};
+
 
 // Draft class strength modifier — makes some years deeper or weaker
 function draftClassStrength(){
