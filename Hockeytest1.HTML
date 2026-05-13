@@ -3188,8 +3188,8 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   const oppBase = (oppTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(oppTeam.roster)) + awayBoost;
   const myStr = myBase + rnd(-10, 10);
   const oppStr = oppBase + rnd(-10, 10);
-  const myAvg = 2 + Math.max(0,(myStr-oppStr)*0.08);
-  const oppAvg = 2 + Math.max(0,(oppStr-myStr)*0.08);
+  const myAvg = 4 + Math.max(0,(myStr-oppStr)*0.08);
+  const oppAvg = 4 + Math.max(0,(oppStr-myStr)*0.08);
   let mg = Math.round(Math.max(0, myAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
   let og = Math.round(Math.max(0, oppAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
   if(mg===og){ if(Math.random()<0.5) mg++; else og++; }
