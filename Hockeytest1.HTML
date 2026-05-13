@@ -992,7 +992,11 @@ const TIER_COLORS = {
   'Depth Forward':          '#566573',
   'Depth Defenseman':       '#566573',
 };
-
+const TAB_GROUP = {
+  roster:'team', lines:'team', affiliates:'team', contracts:'team', log:'team',
+  standings:'league', playoffs:'league', power:'league', calendar:'league', leaders:'league',
+  fa:'transactions', trade:'transactions', resign:'transactions', draft:'transactions',
+};
 class Contract {
   constructor(capPct, years){
     this.capPct = capPct;       // percentage of salary cap e.g. 8.5
@@ -6038,12 +6042,6 @@ function renderContracts(){ if(!gameStarted) return;
 
 // ---- tabs ----
 // Which nav group each tab belongs to
-const TAB_GROUP = {
-  roster:'team', lines:'team', affiliates:'team', contracts:'team', log:'team',
-  standings:'league', playoffs:'league', power:'league', calendar:'league', leaders:'league',
-  fa:'transactions', trade:'transactions', resign:'transactions', draft:'transactions',
-};
-
 function showNavGroup(group){
   document.querySelectorAll('.nav-group-btn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.nav-submenu').forEach(s=>s.classList.remove('active'));
