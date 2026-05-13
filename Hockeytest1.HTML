@@ -972,6 +972,26 @@ const POTENTIAL_TIERS = {
     { role:'Depth Goalie',     ovrRange:[62,72], weight:38  }, // AHL/emergency
   ],
 };
+// Tier color coding — franchise/elite stand out, depth is muted
+const TIER_COLORS = {
+  'Franchise Forward':      '#5dade2',
+  'Franchise Defenseman':   '#5dade2',
+  'Franchise Goalie':       '#5dade2',
+  'Elite Forward':          '#2ecc71',
+  'Elite Defenseman':       '#2ecc71',
+  'Elite Goalie':           '#2ecc71',
+  'Top 6 Forward':          '#aed6f1',
+  'Top Pair Defenseman':    '#aed6f1',
+  'Starting Goalie':        '#aed6f1',
+  'Top 9 Forward':          '#d5dbdb',
+  'Top 4 Defenseman':       '#d5dbdb',
+  'Backup Goalie':          '#d5dbdb',
+  'Bottom 6 Forward':       '#7f8c8d',
+  'Bottom Pair Defenseman': '#7f8c8d',
+  'Depth Goalie':           '#7f8c8d',
+  'Depth Forward':          '#566573',
+  'Depth Defenseman':       '#566573',
+};
 
 class Contract {
   constructor(capPct, years){
@@ -3834,27 +3854,6 @@ function pickTier(tiers){
 // ----------------------------------------------------------------
 // SCOUTING PROJECTION SYSTEM
 // ----------------------------------------------------------------
-
-// Tier color coding — franchise/elite stand out, depth is muted
-const TIER_COLORS = {
-  'Franchise Forward':      '#5dade2',
-  'Franchise Defenseman':   '#5dade2',
-  'Franchise Goalie':       '#5dade2',
-  'Elite Forward':          '#2ecc71',
-  'Elite Defenseman':       '#2ecc71',
-  'Elite Goalie':           '#2ecc71',
-  'Top 6 Forward':          '#aed6f1',
-  'Top Pair Defenseman':    '#aed6f1',
-  'Starting Goalie':        '#aed6f1',
-  'Top 9 Forward':          '#d5dbdb',
-  'Top 4 Defenseman':       '#d5dbdb',
-  'Backup Goalie':          '#d5dbdb',
-  'Bottom 6 Forward':       '#7f8c8d',
-  'Bottom Pair Defenseman': '#7f8c8d',
-  'Depth Goalie':           '#7f8c8d',
-  'Depth Forward':          '#566573',
-  'Depth Defenseman':       '#566573',
-};
 
 // Franchise/Elite tiers get a special glow indicator
 function tierIsElite(role){
