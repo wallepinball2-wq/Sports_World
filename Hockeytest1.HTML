@@ -457,8 +457,30 @@ function showNavGroup(group){
       <span style="color:var(--ice);"> · bright</span>
     </div>
 
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">Goalie Workload Split</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">How many games the starting goalie plays vs the backup. NHL average is around 60–65%.</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <input type="range" id="goalie-split-slider" min="50" max="85" step="1"
+        value="65"
+        oninput="updateGoalieSplit(this.value)"
+        style="flex:1;">
+      <span id="goalie-split-label" style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;min-width:80px;">65% / 35%</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);">
+      Starter plays ~<span id="goalie-split-games">53</span> of 82 games · Backup plays ~<span id="goalie-split-backup-games">29</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">OVR Tier Colors &amp; Labels</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Customize the color and name shown for each overall rating range.</p>
+    <div id="ovr-tier-editor"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" class="btn" onclick="resetOvrTiers()">Reset OVR defaults</button>
+    </div>
+
     <div class="modal-actions" style="margin-top:18px;flex-wrap:wrap;">
-      <button type="button" class="btn" onclick="resetThemeColors()">Reset to default</button>
+      <button type="button" class="btn" onclick="resetThemeColors()">Reset theme</button>
       <button type="button" class="btn btn-primary" onclick="closeModal('modal-settings')">Done</button>
     </div>
   </div>
@@ -891,6 +913,7 @@ const league = {
   salaryCap: 104,          // total cap ceiling in $M
   capFloorPct: 75,         // floor = 75% of cap (teams must spend at least this %)
   minSalary: 0.775,        // league minimum per player in $M
+  starterSharePct: 65,     // % of games started by the #1 goalie (default 65 = ~53 of 82)
   get cap(){ return this.salaryCap; },
   get capFloor(){ return Math.round(this.salaryCap * this.capFloorPct / 100 * 100) / 100; }, // floor in $M
   get capFloorPct_(){ return this.capFloorPct; }
@@ -1306,7 +1329,48 @@ function newGoalie(role){
 
 function newTeam(name){
   const roster = [];
-  [['C',4],['LW',4],['RW',4],['LD',3],['RD',3]].forEach(([pos,count]) => { for(let i=0;i<count;i++) roster.push(newPlayer(pos)); });
+
+  // Forwards (12): built in tiers so no single position group runs away
+  // [ovrMin, ovrMax, ageMin, ageMax]
+  const fwdTiers = [
+    [88, 92, 22, 30],  // 1 franchise forward
+    [84, 88, 22, 32],  // solid top-6
+    [84, 87, 22, 32],  // solid top-6
+    [80, 84, 23, 33],  // mid tier
+    [80, 84, 23, 33],  // mid tier
+    [79, 83, 24, 34],  // mid tier
+    [77, 81, 24, 34],  // mid tier
+    [76, 80, 25, 35],  // mid tier
+    [74, 79, 19, 35],  // depth
+    [73, 78, 19, 35],  // depth
+    [72, 77, 19, 35],  // depth
+    [70, 75, 19, 35],  // depth
+  ];
+  const fwdPositions = ['C','C','C','C','LW','LW','LW','LW','RW','RW','RW','RW'];
+  // Shuffle so tiers don't always go to the same position
+  for(let i=fwdPositions.length-1;i>0;i--){
+    const j=rnd(0,i);
+    [fwdPositions[i],fwdPositions[j]]=[fwdPositions[j],fwdPositions[i]];
+  }
+  fwdTiers.forEach(([oMin,oMax,aMin,aMax],i) => {
+    roster.push(newPlayer(fwdPositions[i], rnd(oMin,oMax), rnd(aMin,aMax)));
+  });
+
+  // Defense (6): strictly tiered — max 1 elite, 2 solid, 2 mid, 1 depth
+  // Hard ceiling on each slot prevents all-88+ defensive corps
+  const defTiers = [
+    [85, 89, 22, 32],  // #1 D — max 89
+    [81, 85, 22, 33],  // top-pair partner — max 85
+    [79, 83, 23, 33],  // 2nd pair — max 83
+    [77, 81, 24, 34],  // 2nd pair partner — max 81
+    [74, 78, 24, 35],  // 3rd pair — max 78
+    [70, 75, 19, 35],  // depth D — max 75
+  ];
+  const defPositions = ['LD','RD','LD','RD','LD','RD'];
+  defTiers.forEach(([oMin,oMax,aMin,aMax],i) => {
+    roster.push(newPlayer(defPositions[i], rnd(oMin,oMax), rnd(aMin,aMax)));
+  });
+
   roster.push(newGoalie('starter'));
   roster.push(newGoalie('backup'));
   roster.push(newGoalie('depth'));
@@ -1547,8 +1611,63 @@ function resetThemeColors(){
   syncThemeColorPickers();
 }
 
+function updateGoalieSplit(val){
+  val = parseInt(val);
+  league.starterSharePct = val;
+  try { localStorage.setItem('goalieSplit', val); } catch(e){}
+  const starterGames = Math.round(82 * val / 100);
+  const backupGames = 82 - starterGames;
+  const lbl = document.getElementById('goalie-split-label');
+  const sg = document.getElementById('goalie-split-games');
+  const bg = document.getElementById('goalie-split-backup-games');
+  if(lbl) lbl.textContent = `${val}% / ${100-val}%`;
+  if(sg) sg.textContent = starterGames;
+  if(bg) bg.textContent = backupGames;
+}
+
+function syncGoalieSplitUI(){
+  const saved = parseInt(localStorage.getItem('goalieSplit') || '65');
+  league.starterSharePct = saved;
+  const slider = document.getElementById('goalie-split-slider');
+  if(slider) slider.value = saved;
+  updateGoalieSplit(saved);
+}
+
+function renderOvrTierEditor(){
+  const el = document.getElementById('ovr-tier-editor');
+  if(!el) return;
+  const maxes = [99, 89, 79, 69, 59, 49, 39, 29, 19, 9];
+  el.innerHTML = OVR_TIERS.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;min-width:52px;color:var(--text2);">${t.min}–${maxes[i]}</span>
+      <input type="color" value="${t.color}" oninput="updateOvrTier(${i},'color',this.value)"
+        style="width:36px;height:28px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;padding:0;">
+      <input type="text" value="${t.label}" oninput="updateOvrTier(${i},'label',this.value)"
+        placeholder="Label" maxlength="16"
+        style="flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;padding:5px 8px;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:${t.color};min-width:24px;">88</span>
+    </div>
+  `).join('');
+}
+
+function updateOvrTier(i, key, value){
+  OVR_TIERS[i][key] = value;
+  saveOvrTiers(OVR_TIERS);
+  applyOvrTierCSS();
+  renderOvrTierEditor(); // re-render to update preview swatch
+}
+
+function resetOvrTiers(){
+  OVR_TIERS = OVR_TIER_DEFAULTS.map(t => ({...t}));
+  saveOvrTiers(OVR_TIERS);
+  applyOvrTierCSS();
+  renderOvrTierEditor();
+}
+
 function showSettings(){
   syncThemeColorPickers();
+  syncGoalieSplitUI();
+  renderOvrTierEditor();
   document.getElementById('modal-settings').classList.add('open');
 }
 
@@ -1790,18 +1909,61 @@ function renderAll(){
 function pts(t){ return t.w*2+t.otl; }
 function allTeams(){ return [state.myTeam, ...state.others]; }
 
+// ── OVR Tier System ─────────────────────────────────────────────
+// Each tier has a min OVR, a default color, and a label.
+// Colors and labels are editable in Settings.
+const OVR_TIER_DEFAULTS = [
+  { min:90, color:'#FFD700', label:'Elite'      },
+  { min:80, color:'#2ecc71', label:'Star'       },
+  { min:70, color:'#5dade2', label:'Starter'    },
+  { min:60, color:'#9b59b6', label:'Fringe'     },
+  { min:50, color:'#e67e22', label:'AHL'        },
+  { min:40, color:'#e74c3c', label:'Depth'      },
+  { min:30, color:'#7f8c8d', label:'Prospect'   },
+  { min:20, color:'#555f6b', label:'Developing' },
+  { min:10, color:'#3d4450', label:'Raw'        },
+  { min:0,  color:'#2c3138', label:'Unrated'    },
+];
+
+function loadOvrTiers(){
+  try {
+    const saved = localStorage.getItem('ovrTiers');
+    if(saved) return JSON.parse(saved);
+  } catch(e){}
+  return OVR_TIER_DEFAULTS.map(t => ({...t}));
+}
+function saveOvrTiers(tiers){ try{ localStorage.setItem('ovrTiers', JSON.stringify(tiers)); }catch(e){} }
+
+let OVR_TIERS = loadOvrTiers();
+
+// Returns the text color for a given OVR value
+function ovrColor(ovr){
+  for(const t of OVR_TIERS){ if(ovr >= t.min) return t.color; }
+  return OVR_TIERS[OVR_TIERS.length-1].color;
+}
+
+// Returns the label for a given OVR value
+function ovrLabel(ovr){
+  for(const t of OVR_TIERS){ if(ovr >= t.min) return t.label; }
+  return OVR_TIERS[OVR_TIERS.length-1].label;
+}
+
+// Injects dynamic CSS for the tier-N classes used by ovrCell/ovrBar
+function applyOvrTierCSS(){
+  let css = '';
+  OVR_TIERS.forEach((t, i) => {
+    css += `.tier-${i} { color: ${t.color}; } `;
+  });
+  let el = document.getElementById('ovr-tier-style');
+  if(!el){ el = document.createElement('style'); el.id = 'ovr-tier-style'; document.head.appendChild(el); }
+  el.textContent = css;
+}
+
 function tierColor(ovr){
-  if(ovr>=90) return 'tier-E';
-  if(ovr>=84) return 'tier-S';
-  if(ovr>=80) return 'tier-B';
-  return 'tier-C';
+  for(let i=0;i<OVR_TIERS.length;i++){ if(ovr>=OVR_TIERS[i].min) return `tier-${i}`; }
+  return `tier-${OVR_TIERS.length-1}`;
 }
-function barColor(ovr){
-  if(ovr>=90) return '#5dade2';
-  if(ovr>=84) return '#2ecc71';
-  if(ovr>=80) return '#aed6f1';
-  return '#e74c3c';
-}
+function barColor(ovr){ return ovrColor(ovr); }
 
 function ovrCell(ovr){
   return `<div class="ovr-bar">
@@ -2018,10 +2180,10 @@ function renderPower(){ if(!gameStarted) return;
       <div class="sname">${t.name}${mine?' ⭐':''}</div>
       <div style="flex:1;display:flex;align-items:center;gap:8px;">
         <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;">
-          <div style="width:${pct}%;height:100%;border-radius:2px;background:${t.ovr>=90?'#5dade2':t.ovr>=80?'#2ecc71':'#e74c3c'};"></div>
+          <div style="width:${pct}%;height:100%;border-radius:2px;background:${ovrColor(t.ovr)};"></div>
         </div>
       </div>
-      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:${t.ovr>=90?'#5dade2':t.ovr>=80?'#2ecc71':'#e74c3c'}">${t.ovr}</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:${ovrColor(t.ovr)}">${t.ovr}</div>
     </div>`;
   }).join('');
 }
@@ -2314,7 +2476,7 @@ function renderTrade(){ if(!gameStarted) return;
             <div onclick="addTradeMy('${p.id}')" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid rgba(100,160,220,0.07);" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-weight:500;">${p.name}${clauseBadge(p)}</span>
-                <span style="color:${p.ovr>=90?'#5dade2':p.ovr>=84?'#2ecc71':p.ovr>=80?'var(--ice)':'var(--red2)'}; font-family:'Barlow Condensed',sans-serif;font-weight:700;">${p.ovr}</span>
+                <span style="color:${ovrColor(p.ovr)}; font-family:'Barlow Condensed',sans-serif;font-weight:700;">${p.ovr}</span>
               </div>
               <div style="display:flex;gap:10px;margin-top:2px;font-size:11px;color:var(--text2);">
                 <span>${p.pos}</span>
@@ -2381,7 +2543,7 @@ function renderTrade(){ if(!gameStarted) return;
             <div onclick="addTradeTheir('${p.id}')" style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid rgba(100,160,220,0.07);" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
               <div style="display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-weight:500;">${p.name}${clauseBadge(p)}</span>
-                <span style="color:${p.ovr>=90?'#5dade2':p.ovr>=84?'#2ecc71':p.ovr>=80?'var(--ice)':'var(--red2)'}; font-family:'Barlow Condensed',sans-serif;font-weight:700;">${p.ovr}</span>
+                <span style="color:${ovrColor(p.ovr)}; font-family:'Barlow Condensed',sans-serif;font-weight:700;">${p.ovr}</span>
               </div>
               <div style="display:flex;gap:10px;margin-top:2px;font-size:11px;color:var(--text2);">
                 <span>${p.pos}</span>
@@ -2594,14 +2756,17 @@ function assignGoalsToTeam(team, goals, isMyTeam){
     }
   }
 
-  // Goalie stats — shots against = goals + saves
+  // Goalie stats — split between starter and backup based on starterSharePct
   if(goalies.length){
-    const starter = goalies[0];
+    // Pick which goalie plays this game based on the configured split
+    const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
+    const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
     const saves = rnd(18, 35);
-    const s = getStatLine(starter);
+    const s = getStatLine(goalie);
     s.ga += goals;
     s.saves += saves;
     s.sa += goals + saves;
+    s.gp = (s.gp || 0) + 1; // goalie-specific GP (separate from team GP)
   }
 }
 
@@ -2998,9 +3163,15 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   assignPlusMinus(oppTeam, og, mg);
   incrementGP(myTeam);
   incrementGP(oppTeam);
-  // Goalie W/L
-  const myG = myTeam.roster.find(p=>p.pos==='G');
-  const oppG = oppTeam.roster.find(p=>p.pos==='G');
+  // Goalie W/L — use same starter/backup split
+  function pickGoalie(team){
+    const gs = team.roster.filter(p=>p.pos==='G');
+    if(!gs.length) return null;
+    const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
+    return (useStarter || gs.length === 1) ? gs[0] : gs[1];
+  }
+  const myG = pickGoalie(myTeam);
+  const oppG = pickGoalie(oppTeam);
   if(myG){ if(result==='W') getStatLine(myG).w=(getStatLine(myG).w||0)+1; else getStatLine(myG).l=(getStatLine(myG).l||0)+1; }
   if(oppG){ if(result!=='W') getStatLine(oppG).w=(getStatLine(oppG).w||0)+1; else getStatLine(oppG).l=(getStatLine(oppG).l||0)+1; }
   return { result, mg, og, opp: oppTeam.name };
@@ -3151,7 +3322,7 @@ function processWeekGames(){
 
   simAffiliateGame(state.ahl);
   simAffiliateGame(state.echl);
-  developAffiliatePlayers();
+  // Development happens once at offseason (startOffseason), not weekly
   return myResults;
 }
 
@@ -3828,17 +3999,30 @@ function newProspect(round, classMod){
 }
 
 function generateDraftClass(){
-  // Roll draft class strength for this year
   const classStrength = draftClassStrength();
   state.draftClassStrength = classStrength;
   console.log(`[Draft] ${classStrength.label} draft class (modifier: ${classStrength.mod})`);
 
+  const TOTAL_PROSPECTS = 425;
+  const DRAFTED_SLOTS = 7 * 32; // 224 real picks
+
   const draftClass = [];
+
+  // Real draft picks (rounds 1-7, 32 picks each)
   for(let r=1; r<=7; r++){
     for(let pk=1; pk<=32; pk++){
       draftClass.push({ round:r, pick:pk, prospect: newProspect(r, classStrength.mod) });
     }
   }
+
+  // Extra undrafted prospects — generated at late-round quality (rounds 6-7)
+  // These go straight to FA if not picked, which they won't be since they have no pick slot
+  const extras = TOTAL_PROSPECTS - DRAFTED_SLOTS;
+  for(let i=0; i<extras; i++){
+    const simRound = rnd(6, 7); // late-round talent level
+    draftClass.push({ round: null, pick: null, undrafted: true, prospect: newProspect(simRound, classStrength.mod) });
+  }
+
   return draftClass;
 }
 
@@ -3973,41 +4157,67 @@ function startOffseason(){
       const decayTable = isGoalie ? GOALIE_DECAY : SKATER_DECAY;
       const attrKeys = isGoalie ? GOALIE_ATTR_KEYS : SKATER_ATTR_KEYS;
       const readyAge = p.devVariance?.readinessAge || 21;
-      const peakAge = p.devVariance?.peakAge || 26;
+      const peakAge  = p.devVariance?.peakAge || 26;
       const trueCeil = p.trueCeilOVR || p.potCeil || p.ovr;
-      const gainMult = p.devVariance?.rate === 'fast' ? 1.2 : p.devVariance?.rate === 'slow' ? 0.6 : 1.0;
+      const devRate  = p.devVariance?.rate || 'normal';
+      const inAffiliate = !nhlClub;
+
+      // How many OVR points this player can gain in a single offseason.
+      // Affiliate league = much slower; NHL = normal pace.
+      // These are HARD maximums — no prospect should jump 5+ OVR in one year.
+      const maxOvrGain = inAffiliate
+        ? (devRate === 'fast' ? 2 : devRate === 'slow' ? 0 : 1)
+        : (devRate === 'fast' ? 3 : devRate === 'slow' ? 1 : 2);
 
       if(!p.attrs){
-        // Fallback for players without attrs
-        if(p.age < peakAge && p.ovr < trueCeil) p.ovr = Math.min(trueCeil, p.ovr + rnd(0,1));
-        else if(p.age > 32) p.ovr = Math.max(60, p.ovr - rnd(0,2));
+        // Fallback for players without attribute objects
+        if(p.age <= peakAge && p.ovr < trueCeil){
+          const gain = inAffiliate ? (Math.random() < 0.4 ? 1 : 0) : rnd(0,1);
+          p.ovr = Math.min(trueCeil, p.ovr + gain);
+        } else if(p.age > 32){
+          p.ovr = Math.max(60, p.ovr - rnd(0,1));
+        }
       } else {
+        // snapshot attrs before any changes so we can roll back excess gain
+        const attrsBefore = {};
+        attrKeys.forEach(k => { attrsBefore[k] = p.attrs[k] || 70; });
+
         attrKeys.forEach(k => {
-          const val = p.attrs[k] || 70;
+          const val = attrsBefore[k];
           let delta = 0;
 
-          if(p.age < readyAge){
-            // Pre-NHL raw development: slow and inconsistent
-            const headroom = Math.max(0, trueCeil - val);
-            delta = headroom > 0 && Math.random() < 0.45 ? rnd(0,1) : 0;
-          } else if(p.age <= peakAge){
-            // Main development window
-            const headroom = Math.max(0, trueCeil - val);
-            const maxGain = headroom <= 2 ? 1 : headroom <= 5 ? rnd(0,2) : rnd(0,3);
-            delta = headroom > 0 ? Math.max(0, Math.round(maxGain * gainMult)) : 0;
+          if(p.age <= peakAge){
+            // Attribute ceiling scales with trueCeil OVR:
+            // A player with trueCeil=85 should have attributes averaging ~85.
+            // We use trueCeil as a soft per-attribute cap too.
+            const attrCeil = Math.min(99, trueCeil + 5); // attrs can slightly exceed OVR ceiling
+            const headroom = Math.max(0, attrCeil - val);
+            if(headroom <= 0){
+              delta = 0; // already at or above ceiling for this attr
+            } else if(p.age < readyAge){
+              // Pre-readiness: very rare gains, small amounts
+              // Affiliate makes it even rarer
+              const chance = inAffiliate ? 0.08 : 0.15;
+              delta = Math.random() < chance ? 1 : 0;
+            } else {
+              // Main development window
+              // chance to gain anything at all this season
+              const gainChance = inAffiliate
+                ? (devRate === 'fast' ? 0.20 : devRate === 'slow' ? 0.08 : 0.13)
+                : (devRate === 'fast' ? 0.35 : devRate === 'slow' ? 0.15 : 0.25);
+              if(Math.random() < gainChance){
+                // Max 1 point per attribute per season — OVR cap enforced below
+                delta = 1;
+              }
+            }
           } else {
-            // Regression phase — attribute-specific decay curves
+            // Regression phase
             const rate = getDecayRate(decayTable[k], p.age);
             if(rate > 0){
-              // Stochastic: not every attribute declines every year
               const roll = Math.random();
-              if(roll < rate * 0.5){
-                delta = -Math.ceil(rate + rnd(0,1));
-              } else if(roll < rate * 0.8){
-                delta = -1;
-              }
-              // Small chance of holding steady even in decline
-              if(Math.random() < 0.15) delta = 0;
+              if(roll < rate * 0.5)       delta = -Math.ceil(rate + rnd(0,1));
+              else if(roll < rate * 0.8)  delta = -1;
+              if(Math.random() < 0.15)    delta = 0;
             }
           }
           p.attrs[k] = Math.min(99, Math.max(40, val + delta));
@@ -4015,6 +4225,28 @@ function startOffseason(){
 
         // Recalculate OVR from updated attributes
         p.ovr = isGoalie ? calcOVR(p.attrs, 'G') : calcOVR(p.attrs, p.pos);
+
+        // Hard cap: if OVR gain this season exceeds maxOvrGain, roll attributes back
+        // until OVR is within the allowed window. This is the real fix — not just
+        // clamping p.ovr (which leaves attrs inflated for next season).
+        if(p.ovr > prevOVR + maxOvrGain){
+          // Roll back attribute gains one by one (in random order) until OVR is in range
+          const order = [...attrKeys].sort(() => Math.random() - 0.5);
+          for(const k of order){
+            if(p.ovr <= prevOVR + maxOvrGain) break;
+            if(p.attrs[k] > attrsBefore[k]){
+              p.attrs[k] = attrsBefore[k]; // undo this attr's gain
+              p.ovr = isGoalie ? calcOVR(p.attrs,'G') : calcOVR(p.attrs, p.pos);
+            }
+          }
+          // Final safety clamp in case rollback left a rounding artifact
+          p.ovr = Math.min(p.ovr, prevOVR + maxOvrGain);
+        }
+
+        // Also hard-cap OVR at trueCeil — prospects cannot exceed their ceiling
+        if(p.ovr > trueCeil){
+          p.ovr = trueCeil;
+        }
       }
 
       // Injury tracking — older players risk missing time
@@ -4214,8 +4446,21 @@ function renderDraft(){ if(!gameStarted) return;
   const currentPick = state.draftClass[draftIdx];
 
   if(round > 7){
-    // Draft over
-    let html = `<div class="offseason-banner"><h2>Draft Complete!</h2><p>Now re-sign your expiring players before free agency opens.</p></div>`;
+    // Draft over — send all undrafted prospects to free agency
+    const undrafted = state.draftClass.filter(dp => !dp.drafted);
+    if(undrafted.length > 0){
+      if(!state.fa) state.fa = [];
+      undrafted.forEach(dp => {
+        dp.drafted = true; // mark so we don't add again
+        const p = dp.prospect;
+        // Give undrafted players a 1-year ELC-style deal
+        p.years = 1;
+        p.salary = p.salary || 0.75;
+        state.fa.push(p);
+      });
+      console.log(`[Draft] ${undrafted.length} undrafted prospects added to free agency`);
+    }
+    let html = `<div class="offseason-banner"><h2>Draft Complete!</h2><p>${undrafted.length} undrafted prospects have entered free agency.</p></div>`;
     html += `<button class="btn btn-red" onclick="goToResign()">Go to Re-Signing →</button>`;
     el.innerHTML = html;
     return;
@@ -4625,7 +4870,7 @@ function renderLineCard(line, type, lineIdx){
   const ovr = lineOVR(line.players);
   const maxOVR = 99, minOVR = 70;
   const pct = ovr ? ((ovr-minOVR)/(maxOVR-minOVR)*100).toFixed(0) : 0;
-  const color = ovr>=90?'#5dade2':ovr>=84?'#2ecc71':ovr>=80?'var(--ice)':'var(--text2)';
+  const color = ovrColor(ovr);
   let html = `<div class="line-card">
     <div class="line-card-title">${line.name}<span class="line-card-ovr" style="color:${color}">${ovr||'—'}</span></div>`;
   line.slots.forEach((pos,i)=>{
@@ -4633,7 +4878,7 @@ function renderLineCard(line, type, lineIdx){
     html += `<div class="line-slot">
       <div class="line-slot-pos">${pos}</div>
       ${p ? `<div class="line-slot-name">${p.name}</div>
-             <div class="line-slot-ovr" style="color:${p.ovr>=90?'#5dade2':p.ovr>=84?'#2ecc71':p.ovr>=80?'var(--ice)':'var(--red2)'}">${p.ovr}</div>
+             <div class="line-slot-ovr" style="color:${ovrColor(p.ovr)}">${p.ovr}</div>
              <button class="btn btn-xs" onclick="removeFromSlot('${type}',${lineIdx},${i})" style="color:var(--red2);border-color:rgba(192,57,43,0.3);">✕</button>`
            : `<div class="line-slot-empty" style="flex:1;">Empty — <span style="cursor:pointer;color:var(--accent);" onclick="openSlotPicker('${type}',${lineIdx},${i})">assign player</span></div>`}
       ${p ? `<button class="btn btn-xs" onclick="openSlotPicker('${type}',${lineIdx},${i})" style="margin-left:2px;">↕</button>` : ''}
@@ -4680,7 +4925,7 @@ function renderLines(){ if(!gameStarted) return;
   ['starter','backup'].forEach(role=>{
     const p = getPlayerById(state.lines.goalies[role]);
     html += `<div class="line-card">
-      <div class="line-card-title">${role==='starter'?'Starter':'Backup'}<span class="line-card-ovr" style="color:${p?(p.ovr>=90?'#5dade2':p.ovr>=84?'#2ecc71':'var(--ice)'):'var(--text2)'}">${p?p.ovr:'—'}</span></div>
+      <div class="line-card-title">${role==='starter'?'Starter':'Backup'}<span class="line-card-ovr" style="color:${p?(ovrColor(p.ovr)):'var(--text2)'}">${p?p.ovr:'—'}</span></div>
       <div class="line-slot">
         <div class="line-slot-pos">G</div>
         ${p ? `<div class="line-slot-name">${p.name}</div>
@@ -4852,22 +5097,8 @@ function simAffiliateGame(affiliate){
 }
 
 function developAffiliatePlayers(){
-  // AHL: faster development
-  state.ahl.roster.forEach(p=>{
-    if(p.isDraftee && p.age < 25 && p.ovr < (p.potCeil||90)){
-      const dev = rnd(0, Math.min(2, (p.potCeil||90) - p.ovr));
-      if(dev>0){ p.ovr += dev; p.salary = Math.max(0.775, salFromOVR(p.ovr)); }
-    } else if(p.age < 24 && p.ovr < (p.potCeil||p.ovr+4)){
-      if(Math.random()<0.3){ p.ovr = Math.min(p.potCeil||99, p.ovr+1); }
-    }
-  });
-  // ECHL: slower development
-  state.echl.roster.forEach(p=>{
-    if(p.isDraftee && p.age < 23 && p.ovr < (p.potCeil||90)){
-      const dev = rnd(0, Math.min(1, (p.potCeil||90) - p.ovr));
-      if(dev>0){ p.ovr += dev; p.salary = Math.max(0.775, salFromOVR(p.ovr)); }
-    }
-  });
+  // Intentionally empty — affiliate development is handled once per offseason
+  // in startOffseason() via the main progression loop, not weekly.
 }
 
 function renderAffiliates(){ if(!gameStarted) return;
@@ -5003,7 +5234,7 @@ function renderPlayerPage(){ if(!gameStarted) return;
 
       </div>
       <div style="text-align:right;">
-        <div style="font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:800;color:${p.ovr>=90?'#5dade2':p.ovr>=84?'#2ecc71':p.ovr>=80?'var(--ice)':'var(--red2)'};">${p.ovr}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:42px;font-weight:800;color:${ovrColor(p.ovr)};">${p.ovr}</div>
         <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;">Overall</div>
       </div>
     </div>
@@ -5027,7 +5258,7 @@ function renderPlayerPage(){ if(!gameStarted) return;
       ${p.injuredLastSeason ? `<div class="stat-card"><div class="stat-card-label">Last Season</div><div class="stat-card-val ${p.injuredLastSeason==='major'?'bad':'warn'}" style="font-size:14px;">🤕 ${p.injuredLastSeason==='major'?'Major Injury':'Minor Injury'}</div></div>` : ''}
       ${p.devVariance&&p.isDraftee ? `<div class="stat-card"><div class="stat-card-label">Dev Type</div><div class="stat-card-val" style="font-size:14px;line-height:1.3;">${p.devVariance.label}</div></div>` : ''}
       ${p.devVariance&&p.isDraftee&&!isNHLReady(p) ? `<div class="stat-card"><div class="stat-card-label">NHL Ready</div><div class="stat-card-val warn" style="font-size:18px;">Age ${p.devVariance.readinessAge}</div></div>` : ''}
-      <div class="stat-card"><div class="stat-card-label">Overall</div><div class="stat-card-val" style="color:${p.ovr>=90?'#5dade2':p.ovr>=84?'#2ecc71':p.ovr>=80?'var(--ice)':'var(--red2)'}">${p.ovr}</div></div>
+      <div class="stat-card"><div class="stat-card-label">Overall</div><div class="stat-card-val" style="color:${ovrColor(p.ovr)}">${p.ovr}</div></div>
       ${p.perceivedRole||p.potential ? `<div class="stat-card"><div class="stat-card-label">${p.age>=27&&p.trueTier?'True Tier':'Scout Report'}</div><div class="stat-card-val" style="font-size:13px;line-height:1.3;">
         ${p.age>=27&&p.trueTier ? `<span style="color:${p.potential==='A'?'#5dade2':p.potential==='B'?'#2ecc71':'var(--text2)'};">${p.trueTier}</span>` : `<span class="prospect-potential pot-${p.potential}">${p.perceivedRole||p.potential}</span>`}
       </div></div>` : ''}
@@ -5771,6 +6002,9 @@ function saveGame(){
 
 // ---- init ----
 loadThemeFromStorage();
+applyOvrTierCSS();
+// Load saved goalie split
+try { league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); } catch(e){}
 bindThemeColorEditor();
 // Show main menu on load instead of auto-starting
 showMenu();
