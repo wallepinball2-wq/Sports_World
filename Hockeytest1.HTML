@@ -2415,34 +2415,58 @@ function advancePickInventory(){
 
 function tradeTeamName(){ return trade.team || (state.others[0]&&state.others[0].name) || ''; }
 
-function tradePlayerOVRValue(players){ return players.reduce((s,id)=>{ const p=state.myTeam.roster.find(x=>x.id===id)||state.others.flatMap(t=>t.roster).find(x=>x.id===id); return s+(p?p.ovr:0); },0); }
+function tradePlayerOVRValue(players){
+  return players.reduce((s, id) => {
+    // Find player in my roster or any other team's roster
+    const p = state.myTeam.roster.find(x => x.id === id) || 
+              state.others.flatMap(t => t.roster).find(x => x.id === id);
+    if (!p) return s;
 
-function tradePickValue(picks){ return picks.reduce((s,pk)=>s+pickValueScore(pk),0); }
+    let val = p.ovr;
+    // THE STAR BUMP: Elite players (88+) get an exponential value boost
+    if (p.ovr >= 88) {
+      val += Math.pow(p.ovr - 86, 1.8); 
+    }
+    // PROSPECT BONUS: 22 or younger with 78+ OVR
+    if (p.age <= 22 && p.ovr >= 78) val += 7;
 
-function myTradeValue(){ return tradePlayerOVRValue(trade.myPlayers) + tradePickValue(trade.myPicks); }
-function theirTradeValue(){
-  const theirTeam = state.others.find(t=>t.name===tradeTeamName());
-  const theirOVR = trade.theirPlayers.reduce((s,id)=>{ const p=theirTeam&&theirTeam.roster.find(x=>x.id===id); return s+(p?p.ovr:0); },0);
-  return theirOVR + tradePickValue(trade.theirPicks);
+    return s + val;
+  }, 0);
 }
 
-function renderTradePanel(){ if(!gameStarted) return;
-  trade.team = trade.team || (state.others[0]&&state.others[0].name);
+function tradePickValue(picks){ 
+  return picks.reduce((s, pk) => s + pickValueScore(pk), 0); 
+}
+
+function myTradeValue(){ 
+  return tradePlayerOVRValue(trade.myPlayers) + tradePickValue(trade.myPicks); 
+}
+
+function theirTradeValue(){
+  // This now uses the same function as above to keep values balanced
+  return tradePlayerOVRValue(trade.theirPlayers) + tradePickValue(trade.theirPicks);
+}
+
+function renderTradePanel(){ 
+  if(!gameStarted) return;
+  trade.team = trade.team || (state.others[0] && state.others[0].name);
   renderTrade();
 }
 
-function renderTrade(){ if(!gameStarted) return;
+function renderTrade(){ 
+  if(!gameStarted) return;
   const el = document.getElementById('trade-body');
   if(!el) return;
   const tname = tradeTeamName();
-  const theirTeam = state.others.find(t=>t.name===tname);
+  const theirTeam = state.others.find(t => t.name === tname);
   const myVal = myTradeValue();
   const theirVal = theirTradeValue();
   const diff = theirVal - myVal;
-  const fairness = Math.abs(diff) < 10 ? { label:'✅ Fair deal', color:'#2ecc71' }
+  
+  // Changed threshold from 10 to 15 for the new "Goldilocks" values
+  const fairness = Math.abs(diff) < 15 ? { label:'✅ Fair deal', color:'#2ecc71' }
                  : diff > 0 ? { label:'📈 You win this trade', color:'#2ecc71' }
                  : { label:'📉 You lose this trade', color:'var(--red2)' };
-
   let html = `
   <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:start;">
 
