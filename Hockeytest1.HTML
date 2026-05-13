@@ -2833,8 +2833,12 @@ function assignPlusMinus(team, goalsFor, goalsAgainst){
 }
 
 function incrementGP(team) {
-  // Only give GP to skaters. Goalies are handled by the pickGoalie logic.
-  team.roster.filter(p => p.pos !== 'G').forEach(p => getStatLine(p).gp++);
+  // We MUST exclude goalies here because they are handled 
+  // separately in the simOneGame function.
+  team.roster.filter(p => p.pos !== 'G').forEach(p => {
+    let s = getStatLine(p);
+    s.gp = (s.gp || 0) + 1;
+  });
 }
 
 function weightedPick(players, attr){
