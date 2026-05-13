@@ -1086,9 +1086,16 @@ const SKATER_ARCHETYPES = {
     defensiveIQ:+12, stickChecking:+10, shotBlocking:+8, faceoffs:+8, poise:+6,
     shootingAccuracy:-10, shotPower:-8, vision:-4,
   },
-  Grinder: {
-    endurance:+8, strength:+8, checking:+6, aggression:+6, 
-    shootingAccuracy:-14, vision:-12, puckHandling:-02, offensiveIQ -10,
+ Grinder: {
+    // Physical/Defensive Boosts (The "Grind")
+    endurance:+10, strength:+12, checking:+15, faceoffs:+8, aggression:+20, 
+    
+    // Offensive Penalties (The "Worst")
+    shootingAccuracy:-20, // Huge penalty to scoring
+    shotPower:-15,        // Their shots will be very weak
+    vision:-18,           // They will almost never get assists
+    puckHandling:-15,     // They will lose the puck easily if they try to dangle
+    offensiveIQ:-15       // They will rarely be in the right spot to score
   },
   Enforcer: {
     strength:+16, checking:+14, aggression:+14,
@@ -2426,12 +2433,15 @@ function tradePlayerOVRValue(players){
     // Using an exponent of 1.2 ensures 81 is worth more than 80 on a smooth curve.
     let val = Math.pow(p.ovr, 1.2); 
 
-    // 3. CURRENT SEASON PRODUCTION: 
-    // Uses p.stats which are reset at the start of each season.
-    // Adds 1 trade point for every 4 points scored this year.
-    if (p.stats && p.stats.pts) {
-      val += (p.stats.pts / 0.5); 
+   // 3. CURRENT SEASON PRODUCTION (Fixed for your stats array)
+// Finds the stats object for the current season
+if (p.stats && Array.isArray(p.stats)) {
+    const currentSeasonStats = p.stats.find(s => s.season === state.season);
+    if (currentSeasonStats && currentSeasonStats.pts) {
+        // Dividing by 0.5 makes every 1 point worth 2.0x trade value
+        val += (currentSeasonStats.pts / 0.5); 
     }
+}
 
     // 4. PROJECTION BONUS: "Franchise" and "Elite" potential
     if (p.role && p.role.includes('Franchise')) val += 25;
