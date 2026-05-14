@@ -6221,8 +6221,51 @@ applyOvrTierCSS();
 // Load saved goalie split
 try { league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); } catch(e){}
 bindThemeColorEditor();
-// Show main menu on load instead of auto-starting
-showMenu();
+// --- FIX: Closing the broken renderPlayerPage function ---
+  el.innerHTML = html;
+}
+
+function closePlayerPage(){
+  document.getElementById('player-page').style.display = 'none';
+  playerPageId = null;
+}
+
+// ---- Navigation & UI ----
+function showMenu(){
+  document.querySelectorAll('.tab-panel, #screen-teamsel').forEach(el => el.classList.remove('active'));
+  document.getElementById('screen-menu').classList.add('active');
+}
+
+function loadGame(){
+  try {
+    const saved = localStorage.getItem('hockeyGMSave');
+    if(!saved) {
+      showFlash('No Save Found', 'Start a new game first!', 'otl');
+      return;
+    }
+    state = JSON.parse(saved);
+    gameStarted = true;
+    renderAll();
+    showTab('roster');
+    showNavGroup('team');
+    document.getElementById('screen-menu').classList.remove('active');
+    showFlash('Welcome Back!', 'Game loaded successfully.', 'win');
+  } catch(e){ console.error(e); }
+}
+
+// ---- Initial Load ----
+window.onload = () => {
+  loadThemeFromStorage();
+  applyOvrTierCSS();
+  // Load saved goalie split
+  try { 
+    league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); 
+  } catch(e){}
+  bindThemeColorEditor();
+  // Show main menu on load
+  showMenu();
+};
+
 </script>
 </body>
 </html>
