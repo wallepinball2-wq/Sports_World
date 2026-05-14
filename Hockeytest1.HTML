@@ -3292,10 +3292,13 @@ function quitToMainMenu(){
 function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   const myBase = (myTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(myTeam.roster)) + homeBoost;
   const oppBase = (oppTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(oppTeam.roster)) + awayBoost;
+  
+  // STAT REALISM FIX: Lowered multipliers for better Save %
   const myStr = myBase + rnd(-10, 10);
   const oppStr = oppBase + rnd(-10, 10);
-  const myAvg = 4 + Math.max(0,(myStr-oppStr)*0.08);
-  const oppAvg = 4 + Math.max(0,(oppStr-myStr)*0.08);
+  const myAvg = 2.5 + Math.max(0,(myStr-oppStr)*0.05); 
+  const oppAvg = 2.5 + Math.max(0,(oppStr-myStr)*0.05);
+
   let mg = Math.round(Math.max(0, myAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
   let og = Math.round(Math.max(0, oppAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
   if(mg===og){ if(Math.random()<0.5) mg++; else og++; }
@@ -3308,8 +3311,10 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   const isMyHome = myTeam.name===state.myTeam.name;
   const isMyAway = oppTeam.name===state.myTeam.name;
 
-  assignGoalsToTeam(myTeam, mg, isMyHome);
-  assignGoalsToTeam(oppTeam, og, isMyAway);
+  // IMPORTANT: We pass mg and og here so the Goalie gets the Win/Loss correctly
+  assignGoalsToTeam(myTeam, mg, isMyHome, mg, og);
+  assignGoalsToTeam(oppTeam, og, isMyAway, mg, og);
+  
   assignPlusMinus(myTeam, mg, og);
   assignPlusMinus(oppTeam, og, mg);
 
@@ -3317,12 +3322,13 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   myTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
   oppTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
 
-  
-// ADD THIS SMALL BLOCK BELOW IT TO STOP THE UI FROM BREAKING
-if (typeof incrementGP === 'undefined') {
-    window.incrementGP = function(team) { /* Already handled in simOneGame */ };
-}
+  if (typeof incrementGP === 'undefined') {
+    window.incrementGP = function(team) { /* Already handled */ };
+  }
 
+  // THIS WAS MISSING: You need to return the result and close the function
+  return { result, mg, og, opp: oppTeam.name };
+}
 // ================================================================
 // CALENDAR + WEEKLY SIMULATION ENGINE
 // Master controller for all league flow and phase transitions.
