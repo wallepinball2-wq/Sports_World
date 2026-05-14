@@ -394,6 +394,19 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 }
 </style>
 <script>
+// --- GLOBAL SETTINGS & CACHES ---
+let teamPreviewCache = {}; // Fixes the "Initialization" error
+const OVR_TIER_DEFAULTS = [
+  { min: 90, label: 'Elite', color: '#5dade2' },
+  { min: 85, label: 'Star', color: '#2ecc71' },
+  { min: 80, label: 'Core', color: '#f1c40f' },
+  { min: 0,  label: 'Depth', color: '#e74c3c' }
+];
+
+// Load OVR_TIERS from storage
+let OVR_TIERS = JSON.parse(localStorage.getItem('hockeyGMOvrTiers')) || JSON.parse(JSON.stringify(OVR_TIER_DEFAULTS));
+
+// ... rest of your script
 // Early shim so nav group buttons work before main script loads
 function showNavGroup(group){
   document.querySelectorAll('.nav-group-btn').forEach(b=>b.classList.remove('active'));
