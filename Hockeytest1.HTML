@@ -2860,43 +2860,46 @@ function calcPTS(p){
 }
 
 // Assign goals/assists to random players on a team for a given goal count
-function assignGoalsToTeam(team, goals, isMyTeam){
-  if(!goals || !team.roster.length) return;
+function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
+  if(!team.roster.length) return;
   const skaters = team.roster.filter(p=>p.pos!=='G');
   const goalies = team.roster.filter(p=>p.pos==='G');
 
-  for(let i=0;i<goals;i++){
-    // Pick a random scorer weighted by OVR
-    const scorer = weightedPick(skaters, 'shootingAccuracy'); // high shooting = more likely to score
-    if(scorer){
-      getStatLine(scorer).g++;
-      getStatLine(scorer).gp = getStatLine(scorer).gp; // ensure gp tracked via game end
-      if(isMyTeam) console.log(`[Stats] ${scorer.name} scored! (${getStatLine(scorer).g}G)`);
-    }
-    // 1-2 assists per goal
-    const numAssists = Math.random()<0.15 ? 1 : Math.random()<0.5 ? 2 : 1;
-    const helpers = skaters.filter(p=>p!==scorer);
-    for(let j=0;j<Math.min(numAssists,helpers.length);j++){
-      const helper = weightedPick(helpers, 'passing'); // high passing/vision = more likely to assist
-      if(helper){
-        getStatLine(helper).a++;
-        if(isMyTeam) console.log(`[Stats] ${helper.name} assist (${getStatLine(helper).a}A)`);
+  // 1. Handle Skaters (Goals and Assists)
+  if(goals > 0) {
+    for(let i=0; i<goals; i++){
+      const scorer = weightedPick(skaters, 'shootingAccuracy');
+      if(scorer){
+        getStatLine(scorer).g++;
+      }
+      const numAssists = Math.random()<0.15 ? 1 : Math.random()<0.5 ? 2 : 1;
+      const helpers = skaters.filter(p=>p!==scorer);
+      for(let j=0; j<Math.min(numAssists,helpers.length); j++){
+        const helper = weightedPick(helpers, 'passing');
+        if(helper) getStatLine(helper).a++;
       }
     }
   }
 
-  // Goalie stats — split between starter and backup based on starterSharePct
+  // 2. Handle Goalie (GP, Saves, W/L) - ONLY ONCE
   if(goalies.length){
-    // Pick which goalie plays this game based on the configured split
+    // Use the league setting or 65% default
     const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
     const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
+    
     const saves = rnd(18, 35);
     const s = getStatLine(goalie);
+    
     s.ga += goals;
     s.saves += saves;
     s.sa += goals + saves;
-    s.gp = (s.gp || 0) + 1; // goalie-specific GP (separate from team GP)
+    s.gp = (s.gp || 0) + 1; // THE ONLY GP ADDITION
+
+    // Win/Loss logic
+    const teamWon = (isMyTeam && mg > og) || (!isMyTeam && og > mg);
+    if(teamWon) s.w = (s.w||0)+1; else s.l = (s.l||0)+1;
   }
+}
 }
 
 function assignPlusMinus(team, goalsFor, goalsAgainst){
@@ -2907,19 +2910,23 @@ function assignPlusMinus(team, goalsFor, goalsAgainst){
     getStatLine(p).pm += goalsFor - goalsAgainst;
   });
 }
+// Goalie stats inside assignGoalsToTeam
+  if(goalies.length){
+    const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
+    const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
+    
+    const saves = rnd(18, 35);
+    const s = getStatLine(goalie);
+    
+    s.ga += goals;
+    s.saves += saves;
+    s.sa += goals + saves;
+    s.gp = (s.gp || 0) + 1; // This is now the ONLY +1 GP for goalies
 
-const myG = pickGoalie(myTeam);
-  const oppG = pickGoalie(oppTeam);
-
-  if(myG){ 
-    let s = getStatLine(myG);
-    s.gp = (s.gp || 0) + 1; // This +1 is the ONLY time a goalie should get GP
-    if(result==='W') s.w=(s.w||0)+1; else s.l=(s.l||0)+1; 
-  }
-  if(oppG){ 
-    let s = getStatLine(oppG);
-    s.gp = (s.gp || 0) + 1;
-    if(result!=='W') s.w=(s.w||0)+1; else s.l=(s.l||0)+1; 
+    // Add Win/Loss logic here:
+    // If it's my team and we scored more than the opponent, it's a win
+    const teamWon = (isMyTeam && mg > og) || (!isMyTeam && og > mg);
+    if(teamWon) s.w = (s.w||0)+1; else s.l = (s.l||0)+1;
   }
 
 function weightedPick(players, attr){
