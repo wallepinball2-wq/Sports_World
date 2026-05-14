@@ -6273,25 +6273,26 @@ function saveGame(){
   } catch(e){ console.error('[Save] Failed:', e); }
 }
 
-// ---- init ----
-loadThemeFromStorage();
-applyOvrTierCSS();
-// Load saved goalie split
-try { league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); } catch(e){}
-bindThemeColorEditor();
-// --- FIX: Closing the broken renderPlayerPage function ---
-  el.innerHTML = html;
+// 1. Navigation for Player Cards
+function openPlayerPage(id){
+  playerPageId = id;
+  playerPageTab = 'overview';
+  const modal = document.getElementById('player-page');
+  if(modal) modal.style.display = 'flex';
+  renderPlayerPage();
 }
 
 function closePlayerPage(){
-  document.getElementById('player-page').style.display = 'none';
+  const modal = document.getElementById('player-page');
+  if(modal) modal.style.display = 'none';
   playerPageId = null;
 }
 
-// ---- Navigation & UI ----
+// 2. Navigation & UI
 function showMenu(){
   document.querySelectorAll('.tab-panel, #screen-teamsel').forEach(el => el.classList.remove('active'));
-  document.getElementById('screen-menu').classList.add('active');
+  const menu = document.getElementById('screen-menu');
+  if(menu) menu.classList.add('active');
 }
 
 function loadGame(){
@@ -6306,21 +6307,20 @@ function loadGame(){
     renderAll();
     showTab('roster');
     showNavGroup('team');
-    document.getElementById('screen-menu').classList.remove('active');
+    const menu = document.getElementById('screen-menu');
+    if(menu) menu.classList.remove('active');
     showFlash('Welcome Back!', 'Game loaded successfully.', 'win');
   } catch(e){ console.error(e); }
 }
 
-// ---- Initial Load ----
+// 3. Initial Load (The "Spark Plug")
 window.onload = () => {
   loadThemeFromStorage();
   applyOvrTierCSS();
-  // Load saved goalie split
   try { 
     league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); 
   } catch(e){}
   bindThemeColorEditor();
-  // Show main menu on load
   showMenu();
 };
 
