@@ -6403,13 +6403,23 @@ function loadGame(){
 
 // 3. Initial Load (The "Spark Plug")
 window.onload = () => {
+  // 1. Visuals & Themes
   loadThemeFromStorage();
-  applyOvrTierCSS();
+  applyOvrTierCSS();      // Paints the player colors (Elite, Star, etc.)
+  
+  // 2. Settings & Logic
+  renderOvrTierEditor();  // Prepares the OVR Editor in the settings menu
+  bindThemeColorEditor(); // Prepares the UI Theme color pickers
+  
   try { 
+    // Load the Goalie Split preference
     league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); 
-  } catch(e){}
-  bindThemeColorEditor();
-  showMenu();
+  } catch(e) {
+    console.error("Failed to load goalie split:", e);
+  }
+
+  // 3. Launch
+  showMenu(); // Opens the Main Menu
 };
 
 </script>
