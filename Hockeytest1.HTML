@@ -2865,7 +2865,7 @@ function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
   const skaters = team.roster.filter(p=>p.pos!=='G');
   const goalies = team.roster.filter(p=>p.pos==='G');
 
-  // 1. Handle Skaters (Goals and Assists)
+  // A. Handle Skaters (Goals and Assists)
   if(goals > 0) {
     for(let i=0; i<goals; i++){
       const scorer = weightedPick(skaters, 'shootingAccuracy');
@@ -2881,10 +2881,10 @@ function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
     }
   }
 
-  // 2. Handle Goalie (GP, Saves, W/L) - ONLY ONCE
+  // B. Handle Goalie (GP, Saves, W/L)
   if(goalies.length){
-    // Use the league setting or 65% default
-    const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
+    // Determine which goalie plays (75% starter, 25% backup)
+    const useStarter = Math.random() * 100 < (league.starterSharePct || 75);
     const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
     
     const saves = rnd(18, 35);
@@ -2901,6 +2901,13 @@ function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
   }
 }
 
+function assignPlusMinus(team, goalsFor, goalsAgainst){
+  const skaters = [...team.roster].filter(p=>p.pos!=='G')
+    .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
+  skaters.forEach(p=>{
+    getStatLine(p).pm += (goalsFor - goalsAgainst);
+  });
+}
 function assignPlusMinus(team, goalsFor, goalsAgainst){
   // Top 6 forwards and top 4 D roughly track +/-
   const skaters = [...team.roster].filter(p=>p.pos!=='G')
