@@ -1443,14 +1443,14 @@ function newTeam(name){
 
   // Defense (6): strictly tiered — max 1 elite, 2 solid, 2 mid, 1 depth
   // Hard ceiling on each slot prevents all-88+ defensive corps
-  const defTiers = [
-    [85, 91, 22, 32],  // #1 D — max 89
-    [81, 85, 22, 33],  // top-pair partner — max 85
-    [84, 86, 23, 33],  // 2nd pair — max 83
-    [83, 84, 24, 34],  // 2nd pair partner — max 81
-    [80, 83, 24, 35],  // 3rd pair — max 78
-    [76, 80, 19, 35],  // depth D — max 75
-  ];
+ const defTiers = [
+    [84, 89, 22, 32],  // Star #1 D — max 89 (Keeps 90+ rare)
+    [81, 84, 22, 33],  // Top-pair partner — max 84
+    [79, 82, 23, 33],  // 2nd pair — max 82
+    [77, 80, 24, 34],  // 2nd pair partner — max 80
+    [75, 78, 24, 35],  // 3rd pair — max 78
+    [72, 76, 19, 35],  // depth D — max 76
+];
   const defPositions = ['LD','RD','LD','RD','LD','RD'];
   defTiers.forEach(([oMin,oMax,aMin,aMax],i) => {
     roster.push(newPlayer(defPositions[i], rnd(oMin,oMax), rnd(aMin,aMax)));
