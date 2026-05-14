@@ -1881,12 +1881,12 @@ function renderOvrTierEditor() {
   });
 }
 
-function updateOvrTier(i, key, value){
-  OVR_TIERS[i][key] = value;
-  saveOvrTiers(OVR_TIERS);
-  applyOvrTierCSS();
-  renderOvrTierEditor(); // re-render to update preview swatch
-}
+// Around Line 1874
+document.getElementById(`ovr-color-${i}`).addEventListener('input', (e) => {
+    OVR_TIERS[i].color = e.target.value;
+    saveOvrTiers(OVR_TIERS);
+    applyOvrTierCSS(); // <--- ADD THIS LINE HERE
+});
 
 function resetOvrTiers(){
   OVR_TIERS = OVR_TIER_DEFAULTS.map(t => ({...t}));
