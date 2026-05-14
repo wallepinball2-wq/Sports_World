@@ -403,6 +403,22 @@ function showNavGroup(group){
   if(btn) btn.classList.add('active');
   if(sub) sub.classList.add('active');
 }
+
+// ADD THIS NEW FUNCTION HERE:
+function showTeamSelect() {
+  // Hide the main menu
+  const menu = document.getElementById('screen-menu');
+  if (menu) menu.classList.remove('active');
+  
+  // Show the team selection screen
+  const teamSel = document.getElementById('screen-teamsel');
+  if (teamSel) teamSel.classList.add('active');
+  
+  // Try to build the team list if the main script is ready
+  if (typeof renderTeamSelectGrid === 'function') {
+    renderTeamSelectGrid();
+  }
+}
 </script>
 </head>
 <body>
