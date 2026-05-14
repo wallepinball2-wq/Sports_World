@@ -1028,8 +1028,34 @@ function isELC(p){ return !!p.isELC; }
 function isELCEligible(p){ return p.isDraftee && p.age <= ELC.maxAge; }
 const MAX_WEEKS = 82;
 const POSITIONS = ['C','LW','RW','LD','RD','G'];
-const FIRSTS = ['Alex','Jordan','Marcus','Tyler','Sam','Chris','Ryan','Mike','Erik','Cole','Drew','Luke','Noah','Liam','Zack','Brett','Owen','Hunter','Kyle','Derek'];
-const LASTS = ['Carter','Stone','Eriksson','Walsh','Petrov','Moore','Jensen','King','Clarke','Hall','Webb','Reed','Barr','Fox','Grant','Burke','Nash','Quinn','Diaz','Park'];
+const FIRSTS = [
+  'Adler','Alaric','Anders','Ansel','Arden','Arlo','Atlas','August','Axel','Barrett',
+  'Beckett','Benedict','Boden','Boone','Bowen','Bram','Brecken','Brooks','Callum','Caspian',
+  'Cato','Cedric','Colter','Conrad','Cormac','Dashiell','Declan','Dexton','Dorian','Eamon',
+  'Elias','Emmett','Enzo','Ewan','Ezra','Felix','Finnian','Fletcher','Flynn','Gage',
+  'Gideon','Griffin','Gunnar','Harlan','Hayes','Hendrix','Hugo','Huxley','Ibsen','Ignatius',
+  'Iver','Jasper','Jethro','Jude','Kael','Kellan','Kiefer','Killian','Knox','Lachlan',
+  'Lars','Leif','Lenz','Lexton','Linus','Lowell','Lucian','Magnus','Marek','Marius',
+  'Milo','Nico','Nils','Nolan','Orion','Oscar','Otto','Otis','Pascal','Pavel',
+  'Quentin','Quill','Rafferty','Rafe','Reid','Remy','Rhys','Ridge','Ronan','Roscoe',
+  'Rowan','Ryker','Silas','Soren','Stellan','Sven','Thatcher','Thayer','Torsten','Tristan',
+  'Urban','Vance','Vaughn','Victor','Viggo','Wilder','Willem','Xander','Zane','Zephyr'
+];
+
+const LASTS = [
+  'Aaby','Ames','Bakke','Barlow','Beck','Berg','Blackwood','Blythe','Borg','Bourne',
+  'Brooks','Calder','Carne','Channing','Corbin','Craggs','Cross','Crowe','Dahl','Dixon',
+  'Drake','Eklund','Ellery','Falk','Fane','Finch','Flint','Foster','Gale','Garrick',
+  'Gentry','Glass','Grier','Grimes','Hale','Hall','Hart','Hawthorne','Hayes','Holm',
+  'Holt','Hurst','Ivers','Jace','Jarvis','Jorgenson','Kane','Keating','Kemp','Kingsley',
+  'Knott','Laine','Lantz','Larkin','Lenz','Lind','Loke','Lund','Main','Marek',
+  'Marsh','Merrit','Miller','Morgans','Morrow','Nash','Niles','Nord','Nyberg','Oakes',
+  'Oland','Pace','Park','Pike','Quinn','Raine','Raske','Reed','Reeve','Ridge',
+  'Rivers','Rixon','Roark','Roux','Ryder','Savage','Skagen','Slade','Sloan','Sorenson',
+  'Steel','Sterling','Stone','Strand','Taggart','Talbot','Thorne','Tierney','Tuma','Vance',
+  'Vane','Vester','Voda','Wade','Ward','West','Wick','Wolfe','Worth','Zale'
+];
+
 // NHL-style league structure
 const DIVISIONS = {
   'Atlantic':   ['Ironwood Wolves','Lakeshore Falcons','Northgate Lynx','Riverbend Sharks','Coastal Fury','Midtown Thunder','Highland Bears','Bayview Cranes'],
