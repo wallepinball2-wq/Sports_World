@@ -403,6 +403,35 @@ const OVR_TIER_DEFAULTS = [
   { min: 0,  label: 'Depth', color: '#e74c3c' }
 ];
 
+function loadGame() {
+  try {
+    const saved = localStorage.getItem('hockeyGMSave');
+    if (!saved) {
+      showFlash('No Save Found', 'Start a new game first!', 'otl');
+      return;
+    }
+    state = JSON.parse(saved);
+    gameStarted = true;
+    renderAll();
+    showTab('roster');
+    showNavGroup('team');
+    const menu = document.getElementById('screen-menu');
+    if (menu) menu.classList.remove('active');
+    showFlash('Welcome Back!', 'Game loaded successfully.', 'win');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function showSettings() {
+  const modal = document.getElementById('modal-settings');
+  if (modal) {
+    modal.classList.add('open');
+    renderOvrTierEditor(); // Ensures the editor is ready when opened
+    syncThemeColorPickers(); // Syncs the theme colors
+  }
+}
+
 // Load OVR_TIERS from storage
 let OVR_TIERS = JSON.parse(localStorage.getItem('hockeyGMOvrTiers')) || JSON.parse(JSON.stringify(OVR_TIER_DEFAULTS));
 
