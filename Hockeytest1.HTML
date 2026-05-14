@@ -1884,10 +1884,20 @@ function selectTeamCard(name){
   console.log('[Team Select] Selected:', name, data);
 }
 
-function showTeamSelect(){
+function showTeamSelect() {
+  // 1. Randomize the team philosophies for this new session
+  randomizeLeagueIdentities();
+  
+  // 2. Clear the cache so it doesn't show players from the previous time you clicked "New Game"
+  teamPreviewCache = {}; 
+
   document.getElementById('screen-menu').classList.remove('active');
   document.getElementById('screen-teamsel').classList.add('active');
+  
+  // 3. Re-render the grid so the new philosophies (colors/text) show up
   renderTeamGrid();
+  
+  // Reset the preview to null so you have to click a team to see the new roster
   renderTeamPreview(selectedTeamName, selectedTeamName ? teamPreviewCache[selectedTeamName] : null);
 }
 
