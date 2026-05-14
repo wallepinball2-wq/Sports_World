@@ -1800,6 +1800,31 @@ function renderTeamGrid(){
     </div>`;
   }).join('');
 }
+// --- SPECIALIZED ROSTER TIERS ---
+
+// REBUILDING: Lower overalls, but younger ages (more "potential" room)
+const rebuildingFwdTiers = [
+  [81, 84, 18, 22], [79, 82, 19, 23], [77, 80, 19, 24], 
+  [75, 78, 20, 25], [74, 77, 21, 26], [72, 75, 22, 27],
+  [70, 74, 23, 28], [68, 72, 20, 30], [66, 70, 18, 32],
+  [65, 68, 18, 32], [65, 68, 18, 32], [65, 68, 18, 32]
+];
+
+// OFFENSIVE/CONTENDER: High-end prime talent
+const offensiveFwdTiers = [
+  [90, 96, 23, 29], [87, 91, 22, 31], [85, 89, 22, 31],
+  [84, 87, 24, 32], [83, 86, 24, 32], [82, 85, 24, 33],
+  [81, 84, 25, 33], [80, 83, 25, 34], [79, 82, 20, 35],
+  [77, 80, 20, 35], [76, 79, 20, 35], [74, 78, 20, 35]
+];
+
+// DEFENSIVE: Slightly lower top-end forwards, but usually paired with better D
+const defensiveFwdTiers = [
+  [86, 91, 24, 30], [84, 88, 24, 32], [83, 86, 24, 32],
+  [82, 85, 25, 33], [81, 84, 25, 33], [80, 83, 25, 34],
+  [79, 82, 26, 35], [78, 81, 26, 35], [77, 80, 20, 35],
+  [76, 79, 20, 35], [75, 78, 20, 35], [74, 77, 20, 35]
+];
 
 function selectTeamCard(name){
   selectedTeamName = name;
