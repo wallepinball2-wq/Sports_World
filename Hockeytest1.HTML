@@ -1418,12 +1418,20 @@ function newTeam(name) {
   const info = TEAM_DATA[name] || { philCode: 'B' };
   const phil = info.philCode;
 
-  // 2. Select the Forward Tiers based on Identity
-  let selectedFwdTiers = fwdTiers; // Default
-  if (phil === 'R') selectedFwdTiers = rebuildingFwdTiers;
-  else if (phil === 'O') selectedFwdTiers = offensiveFwdTiers;
-  else if (phil === 'D') selectedFwdTiers = defensiveFwdTiers;
-
+// 2. Select the Forward Tiers based on Identity
+  // We use offensiveFwdTiers as the "default" if no other match is found
+  let selectedFwdTiers = offensiveFwdTiers; 
+  
+  if (phil === 'R') {
+    selectedFwdTiers = rebuildingFwdTiers;
+  } else if (phil === 'O') {
+    selectedFwdTiers = offensiveFwdTiers;
+  } else if (phil === 'D') {
+    selectedFwdTiers = defensiveFwdTiers;
+  } else {
+    // This is for "Balanced" teams - they get a mix of top-end talent
+    selectedFwdTiers = offensiveFwdTiers; 
+  }
   const fwdPositions = ['C','C','C','C','LW','LW','LW','LW','RW','RW','RW','RW'];
   // Shuffle positions
   for(let i=fwdPositions.length-1; i>0; i--){
