@@ -1613,6 +1613,33 @@ const TEAM_DATA = {
   'Crescent Bay Marlins':   { city:'Crescent Bay' },
 };
 
+function randomizeLeagueIdentities() {
+  const names = Object.keys(TEAM_DATA);
+  
+  // Create a list of roles to distribute
+  // Adjust these numbers if you want more/less rebuilders
+  const roles = [
+    ...Array(6).fill({ p: 'Rebuilding', c: 'R' }),
+    ...Array(8).fill({ p: 'Offensive', c: 'O' }),
+    ...Array(8).fill({ p: 'Defensive', c: 'D' }),
+    ...Array(names.length - 22).fill({ p: 'Balanced', c: 'B' })
+  ];
+
+  // Shuffle the roles list
+  for (let i = roles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [roles[i], roles[j]] = [roles[j], roles[i]];
+  }
+
+  // Inject the roles into our TEAM_DATA object for this session
+  names.forEach((name, i) => {
+    TEAM_DATA[name].philosophy = roles[i].p;
+    TEAM_DATA[name].philCode = roles[i].c;
+  });
+  
+  console.log("League identities randomized!");
+}
+
 // ---- Game State ----
 const gameState = {
   selectedTeam: null,
