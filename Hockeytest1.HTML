@@ -1718,12 +1718,6 @@ const THEME_COLOR_DEFAULTS = {
   '--ice2': '#d4e6f5',
 };
 
-let OVR_TIERS = JSON.parse(localStorage.getItem('hockeyGMOvrTiers')) || OVR_TIER_DEFAULTS;
-
-function saveOvrTiers(tiers) {
-  localStorage.setItem('hockeyGMOvrTiers', JSON.stringify(tiers));
-}
-
 function normalizeHexColor(val){
   if(!val) return '#ffffff';
   const s = String(val).trim();
