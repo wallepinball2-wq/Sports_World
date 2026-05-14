@@ -1412,54 +1412,64 @@ function newGoalie(role){
   return p;
 }
 
-function newTeam(name){
+function newTeam(name) {
   const roster = [];
+  // 1. Get team identity from TEAM_DATA (default to Balanced if not found)
+  const info = TEAM_DATA[name] || { philCode: 'B' };
+  const phil = info.philCode;
 
-  // Forwards (12): built in tiers so no single position group runs away
-  // [ovrMin, ovrMax, ageMin, ageMax]
-  const fwdTiers = [
-    [94, 99, 22, 30],  // 1 franchise forward
-    [91, 94, 22, 32],  // solid top-6
-    [89, 91, 22, 32],  // solid top-6
-    [86, 89, 23, 33],  // mid tier
-    [84, 89, 23, 33],  // mid tier
-    [83, 88, 24, 34],  // mid tier
-    [86, 87, 24, 34],  // mid tier
-    [83, 86, 25, 35],  // mid tier
-    [80, 83, 19, 35],  // depth
-    [80, 82, 19, 35],  // depth
-    [80, 81, 19, 35],  // depth
-    [80, 80, 19, 35],  // depth
-  ];
+  // 2. Select the Forward Tiers based on Identity
+  let selectedFwdTiers = fwdTiers; // Default
+  if (phil === 'R') selectedFwdTiers = rebuildingFwdTiers;
+  else if (phil === 'O') selectedFwdTiers = offensiveFwdTiers;
+  else if (phil === 'D') selectedFwdTiers = defensiveFwdTiers;
+
   const fwdPositions = ['C','C','C','C','LW','LW','LW','LW','RW','RW','RW','RW'];
-  // Shuffle so tiers don't always go to the same position
-  for(let i=fwdPositions.length-1;i>0;i--){
-    const j=rnd(0,i);
-    [fwdPositions[i],fwdPositions[j]]=[fwdPositions[j],fwdPositions[i]];
+  // Shuffle positions
+  for(let i=fwdPositions.length-1; i>0; i--){
+    const j = rnd(0,i);
+    [fwdPositions[i], fwdPositions[j]] = [fwdPositions[j], fwdPositions[i]];
   }
-  fwdTiers.forEach(([oMin,oMax,aMin,aMax],i) => {
-    roster.push(newPlayer(fwdPositions[i], rnd(oMin,oMax), rnd(aMin,aMax)));
+
+  // Create Forwards using the selected tier list
+  selectedFwdTiers.forEach(([oMin, oMax, aMin, aMax], i) => {
+    roster.push(newPlayer(fwdPositions[i], rnd(oMin, oMax), rnd(aMin, aMax)));
   });
 
-  // Defense (6): strictly tiered — max 1 elite, 2 solid, 2 mid, 1 depth
-  // Hard ceiling on each slot prevents all-88+ defensive corps
- const defTiers = [
-    [84, 89, 22, 32],  // Star #1 D — max 89 (Keeps 90+ rare)
-    [81, 84, 22, 33],  // Top-pair partner — max 84
-    [79, 82, 23, 33],  // 2nd pair — max 82
-    [77, 80, 24, 34],  // 2nd pair partner — max 80
-    [75, 78, 24, 35],  // 3rd pair — max 78
-    [72, 76, 19, 35],  // depth D — max 76
-];
+  // 3. Select/Adjust Defense Tiers based on Identity
+  let selectedDefTiers = [
+    [84, 89, 22, 32], [81, 84, 22, 33], [79, 82, 23, 33],
+    [77, 80, 24, 34], [75, 78, 24, 35], [72, 76, 19, 35]
+  ];
+
+  if (phil === 'R') {
+    // Rebuilding defense is weaker and younger
+    selectedDefTiers = [
+      [80, 83, 19, 23], [78, 81, 20, 24], [76, 79, 21, 25],
+      [74, 77, 22, 26], [72, 75, 23, 27], [68, 72, 18, 30]
+    ];
+  } else if (phil === 'D') {
+    // Defensive teams get a slight boost to their Top 4 D
+    selectedDefTiers[0] = [87, 92, 24, 32];
+    selectedDefTiers[1] = [84, 87, 24, 32];
+  }
+
   const defPositions = ['LD','RD','LD','RD','LD','RD'];
-  defTiers.forEach(([oMin,oMax,aMin,aMax],i) => {
-    roster.push(newPlayer(defPositions[i], rnd(oMin,oMax), rnd(aMin,aMax)));
+  selectedDefTiers.forEach(([oMin, oMax, aMin, aMax], i) => {
+    roster.push(newPlayer(defPositions[i], rnd(oMin, oMax), rnd(aMin, aMax)));
   });
 
-  roster.push(newGoalie('starter'));
-  roster.push(newGoalie('backup'));
+  // 4. Goalies
+  if (phil === 'R') {
+    roster.push(newPlayer('G', rnd(78, 82), rnd(20, 25))); // Weak young starter
+    roster.push(newPlayer('G', rnd(74, 77), rnd(20, 35))); // Backup
+  } else {
+    roster.push(newGoalie('starter'));
+    roster.push(newGoalie('backup'));
+  }
   roster.push(newGoalie('depth'));
-  return { name, w:0, l:0, otl:0, roster };
+
+  return { name, w: 0, l: 0, otl: 0, roster };
 }
 
 function teamOVR(roster){
