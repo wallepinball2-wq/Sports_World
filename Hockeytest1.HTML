@@ -1767,6 +1767,34 @@ function loadThemeFromStorage(){
   } catch(e){ console.warn('[Theme] Could not load', e); }
 }
 
+function applyOvrTierCSS() {
+  let css = '';
+  OVR_TIERS.forEach((tier, i) => {
+    // Generates CSS classes: .ovr-tier-0, .ovr-tier-1, etc.
+    css += `.ovr-tier-${i} { color: ${tier.color} !important; }\n`;
+  });
+  
+  let styleEl = document.getElementById('ovr-tier-styles');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'ovr-tier-styles';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.innerHTML = css;
+}
+
+function getOvrTierIndex(ovr) {
+  for (let i = 0; i < OVR_TIERS.length; i++) {
+    if (ovr >= OVR_TIERS[i].min) return i;
+  }
+  return OVR_TIERS.length - 1;
+}
+
+function ovrCell(ovr) {
+  const tier = getOvrTierIndex(ovr);
+  return `<span class="ovr-num ovr-tier-${tier}">${ovr}</span>`;
+}
+
 function getThemeColorMapFromDOM(){
   const root = document.documentElement;
   const map = {};
