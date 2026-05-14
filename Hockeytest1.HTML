@@ -3317,32 +3317,7 @@ function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
   myTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
   oppTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
 
-  // GOALIE SELECTION
-  function pickGoalie(team){
-    const gs = team.roster.filter(p=>p.pos==='G').sort((a,b)=>b.ovr - a.ovr);
-    if(!gs.length) return null;
-    const useStarter = Math.random() * 100 < 75;
-    return (useStarter || gs.length === 1) ? gs[0] : gs[1];
-  }
-
-  const myG = pickGoalie(myTeam);
-  const oppG = pickGoalie(oppTeam);
-
-  // ONLY THE STARTER GETS GP
-  if(myG){ 
-    const s = getStatLine(myG);
-    s.gp = (s.gp||0) + 1; 
-    if(mg > og) s.w = (s.w||0)+1; else s.l = (s.l||0)+1; 
-  }
-  if(oppG){ 
-    const s = getStatLine(oppG);
-    s.gp = (s.gp||0) + 1;
-    if(og > mg) s.w = (s.w||0)+1; else s.l = (s.l||0)+1; 
-  }
-
-  return { result, mg, og, opp: oppTeam.name };
-}
-
+  
 // ADD THIS SMALL BLOCK BELOW IT TO STOP THE UI FROM BREAKING
 if (typeof incrementGP === 'undefined') {
     window.incrementGP = function(team) { /* Already handled in simOneGame */ };
