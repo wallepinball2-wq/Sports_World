@@ -1851,21 +1851,34 @@ function syncGoalieSplitUI(){
   updateGoalieSplit(saved);
 }
 
-function renderOvrTierEditor(){
+function renderOvrTierEditor() {
   const el = document.getElementById('ovr-tier-editor');
-  if(!el) return;
-  const maxes = [99, 89, 79, 69, 59, 49, 39, 29, 19, 9];
+  if (!el) return;
+
+  // This builds the rows for each tier (Elite, Star, etc.)
   el.innerHTML = OVR_TIERS.map((t, i) => `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-      <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;min-width:52px;color:var(--text2);">${t.min}–${maxes[i]}</span>
-      <input type="color" value="${t.color}" oninput="updateOvrTier(${i},'color',this.value)"
-        style="width:36px;height:28px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;padding:0;">
-      <input type="text" value="${t.label}" oninput="updateOvrTier(${i},'label',this.value)"
-        placeholder="Label" maxlength="16"
-        style="flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;padding:5px 8px;">
-      <span style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:${t.color};min-width:24px;">88</span>
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; background:rgba(255,255,255,0.03); padding:8px; border-radius:4px;">
+      <span style="font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; min-width:45px; color:var(--text2);">${t.min}+ OVR</span>
+      <input type="text" value="${t.label}" id="ovr-label-${i}" style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:var(--text); padding:4px 8px; font-size:12px; border-radius:3px;">
+      <input type="color" value="${t.color}" id="ovr-color-${i}" style="width:40px; height:28px; border:none; cursor:pointer; background:none;">
     </div>
   `).join('');
+
+  // Now we add the "Brain" to each input so they update immediately
+  OVR_TIERS.forEach((t, i) => {
+    // Update labels (names)
+    document.getElementById(`ovr-label-${i}`).addEventListener('input', (e) => {
+      OVR_TIERS[i].label = e.target.value;
+      saveOvrTiers(OVR_TIERS);
+    });
+
+    // Update colors AND repaint the screen
+    document.getElementById(`ovr-color-${i}`).addEventListener('input', (e) => {
+      OVR_TIERS[i].color = e.target.value;
+      saveOvrTiers(OVR_TIERS);
+      applyOvrTierCSS(); // <--- THIS is the line that makes it update by default!
+    });
+  });
 }
 
 function updateOvrTier(i, key, value){
