@@ -1717,13 +1717,6 @@ const THEME_COLOR_DEFAULTS = {
   '--ice': '#eaf2f8',
   '--ice2': '#d4e6f5',
 };
-// --- OVR TIER DEFINITIONS ---
-const OVR_TIER_DEFAULTS = [
-  { min: 90, color: '#f1c40f', label: 'Elite' },
-  { min: 80, color: '#2ecc71', label: 'Star' },
-  { min: 70, color: '#5dade2', label: 'Pro' },
-  { min: 0,  color: '#e74c3c', label: 'Minor' }
-];
 
 let OVR_TIERS = JSON.parse(localStorage.getItem('hockeyGMOvrTiers')) || OVR_TIER_DEFAULTS;
 
