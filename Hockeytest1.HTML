@@ -1056,6 +1056,14 @@ const LASTS = [
   'Vane','Vester','Voda','Wade','Ward','West','Wick','Wolfe','Worth','Zale'
 ];
 
+// ADD THESE TWO LINES HERE:
+let playerPageId = null;
+let playerPageTab = 'overview';
+
+// Then your other game variables continue...
+let gameStarted = false; 
+let leagueGoalies90PlusCount = 0;
+
 // NHL-style league structure
 const DIVISIONS = {
   'Atlantic':   ['Ironwood Wolves','Lakeshore Falcons','Northgate Lynx','Riverbend Sharks','Coastal Fury','Midtown Thunder','Highland Bears','Bayview Cranes'],
@@ -5381,8 +5389,6 @@ function renderAffiliates(){ if(!gameStarted) return;
 }
 
 // 1. Declare the variables FIRST
-let playerPageId = null;
-let playerPageTab = 'overview';
 
 // 2. Define the function SECOND
 function openPlayerPage(id){
