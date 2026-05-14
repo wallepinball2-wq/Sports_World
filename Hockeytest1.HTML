@@ -910,6 +910,20 @@ function showNavGroup(group){
 </div>
 
 <script>
+function showTeamSelect() {
+  // Hide the main menu
+  const menu = document.getElementById('screen-menu');
+  if (menu) menu.classList.remove('active');
+  
+  // Show the team selection screen
+  const teamSel = document.getElementById('screen-teamsel');
+  if (teamSel) teamSel.classList.add('active');
+  
+  // Build the grid of teams
+  if (typeof renderTeamSelectGrid === "function") {
+    renderTeamSelectGrid(); 
+  }
+}
 
 // ---- League & Contract System ----
 const league = {
