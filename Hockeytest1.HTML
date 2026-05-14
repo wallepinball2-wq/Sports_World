@@ -5380,14 +5380,16 @@ function renderAffiliates(){ if(!gameStarted) return;
   el.innerHTML = html;
 }
 
-// ---- Player Page ----
+// 1. Declare the variables FIRST
 let playerPageId = null;
 let playerPageTab = 'overview';
 
+// 2. Define the function SECOND
 function openPlayerPage(id){
   playerPageId = id;
   playerPageTab = 'overview';
-  document.getElementById('player-page').style.display = 'block';
+  const el = document.getElementById('player-page');
+  if(el) el.style.display = 'block';
   renderPlayerPage();
 }
 
