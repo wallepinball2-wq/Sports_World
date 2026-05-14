@@ -5418,10 +5418,68 @@ function renderAffiliates(){ if(!gameStarted) return;
 // (LEAVE THIS BLANK - WE MOVED THEM TO THE TOP!)
 
 // 2. Define the function SECOND
+// 1. Separate openPlayerPage
 function openPlayerPage(id){
   playerPageId = id;
   playerPageTab = 'overview';
-  // ...
+  document.getElementById('player-page').style.display = 'flex';
+  renderPlayerPage();
+}
+
+// 2. The corrected renderPlayerPage function
+function renderPlayerPage(){
+  if(!gameStarted) return;
+  
+  // Define 'el' here so the computer knows where to put the HTML
+  const el = document.getElementById('player-page-content');
+  if(!el) return;
+
+  const found = findPlayerById(playerPageId);
+  if(!found){ 
+    el.innerHTML='<p style="color:var(--text2)">Player not found.</p>'; 
+    return; 
+  }
+
+  const p = found.player;
+  const s = getStatLine(p);
+  const isGoalie = p.pos==='G';
+  const isFA = found.source === 'fa';
+  const isOtherTeam = found.source === 'other';
+
+  // --- Start Building HTML ---
+  let html = `
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap;">
+      <div style="width:60px;height:60px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:22px;flex-shrink:0;">
+        ${p.pos}
+      </div>
+      <div style="flex:1;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;line-height:1;">${p.name}</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:3px;">Age ${p.age} · OVR ${p.ovr}</div>
+      </div>
+    </div>
+  `;
+  // Add whatever player details you want here
+  
+  // Now el is defined, so this line will work!
+  el.innerHTML = html; 
+}
+
+// 3. Final utility functions
+function closePlayerPage(){
+  document.getElementById('player-page').style.display = 'none';
+  playerPageId = null;
+}
+
+function showMenu(){
+  document.querySelectorAll('.tab-panel, #screen-teamsel').forEach(el => el.classList.remove('active'));
+  document.getElementById('screen-menu').classList.add('active');
+}
+
+window.onload = () => {
+  loadThemeFromStorage();
+  applyOvrTierCSS();
+  showMenu();
+};
 
 function closePlayerPage(){
   document.getElementById('player-page').style.display = 'none';
