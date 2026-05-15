@@ -6380,7 +6380,10 @@ function closePlayerPage(){
 function showMenu(){
   document.querySelectorAll('.tab-panel, #screen-teamsel').forEach(el => el.classList.remove('active'));
   const menu = document.getElementById('screen-menu');
-  if(menu) menu.classList.add('active');
+  if(menu) {
+    menu.classList.add('active');
+    menu.style.display = 'flex';
+  }
 }
 
 function loadGame(){
@@ -6401,6 +6404,15 @@ function loadGame(){
   } catch(e){ console.error(e); }
 }
 
+// Add this so your Settings button works!
+function showSettings() {
+  const modal = document.getElementById('modal-settings');
+  if (modal) {
+    modal.classList.add('open');
+    renderOvrTierEditor(); 
+  }
+}
+
 // 3. Initial Load (The "Spark Plug")
 window.onload = () => {
   // 1. Visuals & Themes
@@ -6413,7 +6425,9 @@ window.onload = () => {
   
   try { 
     // Load the Goalie Split preference
-    league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); 
+    if(typeof league !== 'undefined') {
+       league.starterSharePct = parseInt(localStorage.getItem('goalieSplit') || '65'); 
+    }
   } catch(e) {
     console.error("Failed to load goalie split:", e);
   }
