@@ -2098,3 +2098,303 @@ function renderTeamPreview(name, team){
   if(statRosterSize) statRosterSize.textContent = rosterSize || '—';
   if(statAvgAge) statAvgAge.textContent = avgAge || '—';
   if(tbody){
+  tbody.innerHTML = team.roster.map((p,i)=>`
+      <tr>
+        <td style="color:var(--text2);font-size:12px;">${i+1}</td>
+        <td style="font-weight:500;color:#fff;">${p.name}</td>
+        <td><span class="pos-badge" style="font-size:11px;padding:2px 6px;">${p.pos}</span></td>
+        <td>${p.ovr}</td>
+        <td>$${p.salary.toFixed(2)}M</td>
+      </tr>
+    `).join('');
+  }
+}
+
+function confirmTeamSelect(){
+  if(!selectedTeamName) return;
+  gameState.selectedTeam = selectedTeamName;
+  gameState.currentSeason = 1;
+  console.log('[Game Start] Starting as GM of:', gameState.selectedTeam);
+  startGame(selectedTeamName, false, teamPreviewCache[selectedTeamName]);
+}
+
+function startGame(teamName, isLoad, previewTeam){
+  document.getElementById('screen-teamsel').classList.remove('active');
+  document.getElementById('screen-menu').classList.remove('active');
+  document.getElementById('app').style.display = 'block';
+  gameStarted = true;
+  if(!isLoad){
+    initState(teamName, previewTeam);
+    autoSetLines();
+    renderAll();
+    renderPlayoffs();
+  } else {
+    autoSetLines();
+    renderAll();
+    renderPlayoffs();
+  }
+  console.log('[Game] Season', gameState.currentSeason, '| Team:', teamName);
+}
+
+function initState(teamName, previewTeam){
+  leagueGoalies90PlusCount = 0;
+  leagueGoalies88PlusCount = 0;
+  state = {
+    season: 1, week: 1, playoffsStarted: false, bracket: null,
+    myTeam: previewTeam || newTeam(teamName||'Ironwood Wolves'),
+    others: TEAM_NAMES.filter(n => n !== (teamName||'Ironwood Wolves')).map(n => newTeam(n)),
+    fa: Array.from({length:150}, () => newFAPlayer()),
+    log: [],
+    morale: 0,
+    lines: {
+      forwards: [
+        { name:'Line 1', slots:['C','LW','RW'], players:[null,null,null] },
+        { name:'Line 2', slots:['C','LW','RW'], players:[null,null,null] },
+        { name:'Line 3', slots:['C','LW','RW'], players:[null,null,null] },
+        { name:'Line 4', slots:['C','LW','RW'], players:[null,null,null] }
+      ],
+      defense: [
+        { name:'Pair 1', slots:['LD','RD'], players:[null,null] },
+        { name:'Pair 2', slots:['LD','RD'], players:[null,null] },
+        { name:'Pair 3', slots:['LD','RD'], players:[null,null] }
+      ],
+      goalies: { starter:null, backup:null }
+    },
+    ahl: { name:(teamName||'Ironwood').split(' ').slice(-1)[0]+' Pack', roster:[], w:0, l:0, otl:0, log:[] },
+    echl: { name:(teamName||'Ironwood').split(' ').slice(-1)[0]+' Prospects', roster:[], w:0, l:0, otl:0, log:[] }
+  };
+  // Initialize calendar — master controller of all league flow
+  state.calendar = freshCalendar(2025);
+  state.week = 1;
+  state.pickInventory = [];
+  state.schedule = generateSchedule();
+  initPickInventory();
+  logPlayerTraits(state.myTeam.roster);
+}
+
+// ---- render ----
+function setEl(id, val, prop='textContent'){
+  const el = document.getElementById(id);
+  if(el) el[prop] = val;
+}
+
+function renderAll(){
+  if(!state || !state.myTeam || !gameStarted) return;
+  const t = state.myTeam;
+  const myPts = t.w*2 + t.otl;
+  setEl('hdr-name', t.name);
+  setEl('hdr-logo', t.name.split(' ').map(w=>w[0]).join('').slice(0,2));
+  setEl('hdr-season', state.season);
+  setEl('hdr-record', `${t.w}-${t.l}-${t.otl}`);
+  setEl('hdr-pts', myPts);
+  const cal = state.calendar || { phase:'Regular Season', week:state.week||1, regularSeasonWeeks:28, year:2025 };
+  const phaseLabel = cal.phase || 'Regular Season';
+  const weekLabel = cal.week <= cal.regularSeasonWeeks ? `Wk ${cal.week}` : 'Done';
+  setEl('hdr-week', weekLabel);
+  setEl('hdr-sub', `${cal.year} · ${phaseLabel}`);
+
+  const cap = capLeft();
+  const capEl = document.getElementById('sc-cap');
+  const capPctUsed = Math.round((capUsed()/league.salaryCap)*100);
+  const belowFloor = isBelowFloor(state.myTeam);
+  if(capEl){
+    capEl.textContent = `$${cap.toFixed(1)}M (${capPctUsed}% used)`;
+    capEl.className = 'stat-card-val' + (cap<4?' bad': belowFloor?' warn':cap<10?' warn':' good');
+    const capLabel = capEl.previousElementSibling;
+    if(capLabel) capLabel.textContent = belowFloor
+      ? `CAP SPACE ⚠️ -$${floorDeficit(state.myTeam).toFixed(1)}M FLOOR`
+      : 'Cap Space';
+  }
+
+  const ovr = teamOVR(t.roster);
+  const ovrEl = document.getElementById('sc-ovr');
+  if(ovrEl){
+    ovrEl.textContent = ovr || '—';
+    ovrEl.className = 'stat-card-val' + (ovr>=80?' good':ovr>=70?'':' warn');
+  }
+
+  setEl('sc-roster', t.roster.length);
+  setEl('sc-morale', state.morale>=3?'🔥':state.morale>0?'😄':state.morale<-3?'😞':state.morale<0?'😐':'😐');
+
+  const all = allTeams().sort((a,b) => pts(b)-pts(a));
+  const myRank = all.findIndex(x => x.name === t.name) + 1;
+  setEl('sc-standing', myRank ? `#${myRank}` : '—');
+
+  renderRoster();
+  renderFA();
+  renderStandings();
+  renderPower();
+  renderLeaders();
+  renderPlayoffs();
+  renderLog();
+  renderContracts();
+}
+
+function pts(t){ return t.w*2+t.otl; }
+function allTeams(){ return [state.myTeam, ...state.others]; }
+
+// ── OVR Tier System ─────────────────────────────────────────────
+// Each tier has a min OVR, a default color, and a label.
+// Colors and labels are editable in Settings.
+const OVR_TIER_DEFAULTS = [
+  { min:90, color:'#FFD700', label:'Elite'      },
+  { min:80, color:'#2ecc71', label:'Star'       },
+  { min:70, color:'#5dade2', label:'Starter'    },
+  { min:60, color:'#9b59b6', label:'Fringe'     },
+  { min:50, color:'#e67e22', label:'AHL'        },
+  { min:40, color:'#e74c3c', label:'Depth'      },
+  { min:30, color:'#7f8c8d', label:'Prospect'   },
+  { min:20, color:'#555f6b', label:'Developing' },
+  { min:10, color:'#3d4450', label:'Raw'        },
+  { min:0,  color:'#2c3138', label:'Unrated'    },
+];
+
+function loadOvrTiers(){
+  try {
+    const saved = localStorage.getItem('ovrTiers');
+    if(saved) return JSON.parse(saved);
+  } catch(e){}
+  return OVR_TIER_DEFAULTS.map(t => ({...t}));
+}
+function saveOvrTiers(tiers){ try{ localStorage.setItem('ovrTiers', JSON.stringify(tiers)); }catch(e){} }
+
+let OVR_TIERS = loadOvrTiers();
+
+// Returns the text color for a given OVR value
+function ovrColor(ovr){
+  for(const t of OVR_TIERS){ if(ovr >= t.min) return t.color; }
+  return OVR_TIERS[OVR_TIERS.length-1].color;
+}
+
+// Returns the label for a given OVR value
+function ovrLabel(ovr){
+  for(const t of OVR_TIERS){ if(ovr >= t.min) return t.label; }
+  return OVR_TIERS[OVR_TIERS.length-1].label;
+}
+
+// Injects dynamic CSS for the tier-N classes used by ovrCell/ovrBar
+function applyOvrTierCSS(){
+  let css = '';
+  OVR_TIERS.forEach((t, i) => {
+    css += `.tier-${i} { color: ${t.color}; } `;
+  });
+  let el = document.getElementById('ovr-tier-style');
+  if(!el){ el = document.createElement('style'); el.id = 'ovr-tier-style'; document.head.appendChild(el); }
+  el.textContent = css;
+}
+
+function tierColor(ovr){
+  for(let i=0;i<OVR_TIERS.length;i++){ if(ovr>=OVR_TIERS[i].min) return `tier-${i}`; }
+  return `tier-${OVR_TIERS.length-1}`;
+}
+function barColor(ovr){ return ovrColor(ovr); }
+
+function ovrCell(ovr){
+  return `<div class="ovr-bar">
+    <span class="ovr-num ${tierColor(ovr)}">${ovr}</span>
+    <div class="bar-track"><div class="bar-fill" style="width:${((ovr-50)/50*100).toFixed(0)}%;background:${barColor(ovr)}"></div></div>
+  </div>`;
+}
+
+function applySortRoster(roster){
+  const { key, dir } = rosterSort;
+  return [...roster].sort((a,b)=>{
+    if(key==='pos') return (POSITIONS.indexOf(a.pos)-POSITIONS.indexOf(b.pos))*dir;
+    if(key==='name') return a.name.localeCompare(b.name)*dir;
+    return (a[key]-b[key])*dir;
+  });
+}
+
+function sortRoster(key){
+  if(rosterSort.key===key) rosterSort.dir*=-1;
+  else { rosterSort.key=key; rosterSort.dir = key==='ovr'?-1:1; }
+  updateSortIndicators('roster', ['name','pos','age','ovr','salary','years']);
+  renderRoster();
+}
+
+function sortDraft(key){
+  if(draftSort.key===key) draftSort.dir*=-1;
+  else { draftSort.key=key; draftSort.dir = key==='ovr'?-1:1; }
+  renderDraft();
+}
+
+function sortFA(key){
+  if(faSort.key===key) faSort.dir*=-1;
+  else { faSort.key=key; faSort.dir = key==='ovr'?-1:1; }
+  updateSortIndicators('fa', ['name','pos','age','ovr','salary']);
+  renderFA();
+}
+
+function updateSortIndicators(table, keys){
+  const s = table==='roster' ? rosterSort : faSort;
+  keys.forEach(k=>{
+    const el = document.getElementById(`sort-${table}-${k}`);
+    if(el) el.textContent = s.key===k ? (s.dir===1?'↑':'↓') : '';
+  });
+}
+
+function renderRoster(){ if(!gameStarted) return;
+  const tbody = document.getElementById('roster-tbody');
+  const sorted = applySortRoster(state.myTeam.roster);
+  tbody.innerHTML = sorted.map((p,i) => `
+    <tr>
+      <td style="color:var(--text2);font-size:12px;">${i+1}</td>
+      <td style="font-weight:500;cursor:pointer;color:#fff;" onclick="openPlayerPage('${p.id}')" title="${p.archetype||''}">${p.name}</td>
+      <td><span class="pos-badge">${p.pos}</span></td>
+      <td>${p.age}</td>
+      <td>${ovrCell(p.ovr)}${p.decliningFast?'<span title="Rapid decline" style="font-size:10px;color:var(--red2);margin-left:3px;">⬇⬇</span>':p.inDecline?'<span title="In decline" style="font-size:10px;color:var(--gold);margin-left:3px;">⬇</span>':''}</td>
+      <td>${projBadge(p)}${(()=>{ const rl=readinessLabel(p); return rl?` <span style="font-size:10px;color:${rl.color};">${rl.text}</span>`:''; })()}</td>
+      <td>$${p.salary.toFixed(2)}M <span style='font-size:10px;color:var(--text2);'>(${salaryToCapPct(p.salary).toFixed(2)}%)</span></td>
+      <td>${p.years}yr${p.isELC?` <span style="font-size:10px;font-family:'Barlow Condensed',sans-serif;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(243,156,18,0.15);color:var(--gold);border:1px solid rgba(243,156,18,0.3);">ELC</span>`:''}${clauseBadge(p)}
+</td>
+
+      <td style="display:flex;gap:6px;"><button class="btn btn-sm" onclick="openExtend('${p.id}')">Extend</button><button class="btn btn-sm" onclick="openRelease('${p.id}')" style="border-color:rgba(192,57,43,0.4);color:var(--red2);">Cut</button></td>
+    </tr>`).join('');
+}
+
+function renderFA(){ if(!gameStarted) return;
+  const tbody = document.getElementById('fa-tbody');
+  const sortedFA = [...state.fa].sort((a,b)=>{
+    const { key, dir } = faSort;
+    if(key==='name') return a.name.localeCompare(b.name)*dir;
+    if(key==='pos') return (POSITIONS.indexOf(a.pos)-POSITIONS.indexOf(b.pos))*dir;
+    return (a[key]-b[key])*dir;
+  });
+  tbody.innerHTML = sortedFA.map(p => `
+    <tr>
+      <td style="font-weight:500;cursor:pointer;color:#fff;" onclick="openPlayerPage('${p.id}')" title="Click to view player card">${p.name}${p._myTeam?'<span style="font-size:10px;color:var(--gold);margin-left:6px;">YOUR FA</span>':''}</td>
+      <td><span class="pos-badge">${p.pos}</span></td>
+      <td>${p.age}</td>
+      <td>${ovrCell(p.ovr)}</td>
+      <td>${projBadge(p)}</td>
+      <td>$${p.salary.toFixed(1)}M/yr</td>
+
+      <td><button class="btn btn-sm btn-gold" onclick="openSign('${p.id}')">Sign</button></td>
+    </tr>`).join('');
+  // Add new season button if in offseason FA phase
+  const panel = document.getElementById('panel-fa');
+  let banner = panel.querySelector('.fa-offseason-banner');
+  if(state.offseasonPhase==='fa'){
+    if(!banner){
+      banner = document.createElement('div');
+      banner.className='fa-offseason-banner offseason-banner';
+      banner.style.marginBottom='16px';
+      banner.innerHTML=`<h2>Free Agency</h2><p>Sign who you need, then start the new season.</p><button class="btn btn-red" style="margin-top:10px;" onclick="startNewSeason()">▶ Start Season ${(state.season||1)+1}</button>`;
+      panel.insertBefore(banner, panel.firstChild);
+    }
+  } else if(banner){ banner.remove(); }
+}
+
+function getTeamByName(name){ return allTeams().find(t=>t.name===name); }
+
+/** Resolve a player for the player card: your roster, FA, or another NHL team. */
+function findPlayerById(id){
+  const mine = state.myTeam.roster.find(x => x.id === id);
+  if(mine) return { player: mine, source: 'my' };
+  const fa = state.fa.find(x => x.id === id);
+  if(fa) return { player: fa, source: 'fa' };
+  for(const t of state.others || []){
+    const op = t.roster.find(x => x.id === id);
+    if(op) return { player: op, source: 'other', teamName: t.name };
+  }
+  return null;
