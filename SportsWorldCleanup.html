@@ -3475,3 +3475,289 @@ function simSeason(){
     showFlash('Already done!', 'Regular season is over.', 'otl');
     return;
   }   
+
+      // Process every remaining regular season week
+  while(cal.week <= cal.regularSeasonWeeks){
+    const myResults = processWeekGames();
+    myResults.forEach(r => {
+      const cls = r.result==='W'?'res-W':r.result==='L'?'res-L':'res-OTL';
+      const dateStr = r.monthName && r.day ? ` ${r.monthName.slice(0,3)} ${r.day}` : ` Wk${cal.week}`;
+      state.log.push(`<span class="wk">${dateStr}</span><span class="${cls}">${r.result}</span> vs ${r.oppName} — ${r.myG}–${r.oppG}`);
+      if(r.result==='W') state.morale = Math.min(5, state.morale+1);
+      else if(r.result==='L') state.morale = Math.max(-5, state.morale-1);
+    });
+    cal.week++;
+    state.week = cal.week;
+  }
+
+  cal.phase = PHASES.PLAYOFFS;
+  state.log.push('🏒 Regular season complete — playoffs begin!');
+  showFlash('Season Complete!', 'Playoffs are set!', 'otl');
+  renderAll();
+  startPlayoffs();
+}
+
+// ---- flash ----
+function showFlash(title, body, type){
+  const el = document.getElementById('flash');
+  document.getElementById('flash-title').textContent = title;
+  document.getElementById('flash-body').textContent = body;
+  el.className = 'flash show ' + (type||'');
+  if(flashTimer) clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { el.className = 'flash'; }, 3200);
+}
+
+// ---- playoffs ----
+function startPlayoffs(){
+  // Reset playoff stats for all players
+  allTeams().forEach(team => {
+    team.roster.forEach(p => { p.playoffStats = freshPlayoffStats(p.pos); });
+  });
+  const { playoffTeams, wildcards } = getPlayoffTeams();
+  // Build bracket: per conference, seed div winners 1-3, then wildcards 4-5 (but we have 8 per conf)
+  state.playoffsStarted = true;
+  state.bracket = buildBracket();
+  const tabPO = document.getElementById('tab-playoffs'); if(tabPO) tabPO.style.display = '';
+  renderAll();
+  showTab('playoffs');
+  state.log.push('🏆 Playoffs have begun!');
+}
+
+function buildBracket(){
+  const bracket = { rounds: [], champion: null };
+  const confSeeds = {};
+
+  Object.entries(CONFERENCES).forEach(([conf, divs])=>{
+    // Gather ALL teams in this conference, sort by points
+    const allConfTeams = [];
+    divs.forEach(div=>{
+      const divTeams = DIVISIONS[div].map(n=>getTeamByName(n)).filter(Boolean);
+      allConfTeams.push(...divTeams);
+    });
+    // Get top 3 from each division first
+    const divTop3 = [];
+    divs.forEach(div=>{
+      const sorted = DIVISIONS[div].map(n=>getTeamByName(n)).filter(Boolean).sort((a,b)=>pts(b)-pts(a));
+      sorted.slice(0,3).forEach(t=>divTop3.push(t));
+    });
+    // Wildcards: remaining conf teams sorted by pts, take top 2
+    const divTop3Names = new Set(divTop3.map(t=>t.name));
+    const wildcards = allConfTeams.filter(t=>!divTop3Names.has(t.name)).sort((a,b)=>pts(b)-pts(a)).slice(0,2);
+    // Final 8: sort div qualifiers by pts, then wildcards
+    divTop3.sort((a,b)=>pts(b)-pts(a));
+    const seeds = [...divTop3, ...wildcards].slice(0,8);
+    confSeeds[conf] = seeds;
+  });
+
+  // First round: 1v8, 2v7, 3v6, 4v5 per conference
+  const round1 = [];
+  Object.entries(confSeeds).forEach(([conf, seeds])=>{
+    [[0,7],[1,6],[2,5],[3,4]].forEach(([a,b])=>{
+      const home = seeds[a], away = seeds[b];
+      if(home && away){
+        round1.push({ conf, home: home.name, away: away.name, homeW:0, awayW:0, done:false, winner:null });
+      }
+    });
+  });
+
+  bracket.rounds = [round1];
+  return bracket;
+}
+
+function simPlayoffGame(homeTeam, awayTeam){
+  // Like simOneGame but writes to playoffStats not regular stats
+  const myBase = (homeTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(homeTeam.roster));
+  const oppBase = (awayTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(awayTeam.roster));
+  const myStr = myBase + rnd(-10,10);
+  const oppStr = oppBase + rnd(-10,10);
+  const myAvg = 2 + Math.max(0,(myStr-oppStr)*0.08);
+  const oppAvg = 2 + Math.max(0,(oppStr-myStr)*0.08);
+  let mg = Math.round(Math.max(0, myAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
+  let og = Math.round(Math.max(0, oppAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
+  if(mg===og){ if(Math.random()<0.5) mg++; else og++; }
+
+  // Assign playoff stats
+  const isMyHome = homeTeam.name===state.myTeam.name;
+  const isMyAway = awayTeam.name===state.myTeam.name;
+  assignPlayoffGoals(homeTeam, mg, isMyHome);
+  assignPlayoffGoals(awayTeam, og, isMyAway);
+  incrementPlayoffGP(homeTeam);
+  incrementPlayoffGP(awayTeam);
+  // Goalie W/L
+  const hG = homeTeam.roster.find(p=>p.pos==='G');
+  const aG = awayTeam.roster.find(p=>p.pos==='G');
+  if(hG){ if(mg>og) getPlayoffStatLine(hG).w=(getPlayoffStatLine(hG).w||0)+1; else getPlayoffStatLine(hG).l=(getPlayoffStatLine(hG).l||0)+1; }
+  if(aG){ if(og>mg) getPlayoffStatLine(aG).w=(getPlayoffStatLine(aG).w||0)+1; else getPlayoffStatLine(aG).l=(getPlayoffStatLine(aG).l||0)+1; }
+
+  let result;
+  if(mg>og){ homeTeam.w++; result='W'; }
+  else if(mg<og){ homeTeam.l++; awayTeam.w++; result='L'; }
+  else { homeTeam.otl++; awayTeam.w++; result='OTL'; }
+  return { result, mg, og };
+}
+
+function assignPlayoffGoals(team, goals, isMyTeam){
+  if(!goals || !team.roster.length) return;
+  const skaters = team.roster.filter(p=>p.pos!=='G');
+  const goalies = team.roster.filter(p=>p.pos==='G');
+  for(let i=0;i<goals;i++){
+    const scorer = weightedPick(skaters,'shootingAccuracy');
+    if(scorer){ getPlayoffStatLine(scorer).g=(getPlayoffStatLine(scorer).g||0)+1; }
+    const numAssists = Math.random()<0.15 ? 1 : 2;
+    const helpers = skaters.filter(p=>p!==scorer);
+    for(let j=0;j<Math.min(numAssists,helpers.length);j++){
+      const helper = weightedPick(helpers,'passing');
+      if(helper){ getPlayoffStatLine(helper).a=(getPlayoffStatLine(helper).a||0)+1; }
+    }
+  }
+  if(goalies.length){
+    const s = getPlayoffStatLine(goalies[0]);
+    const saves = rnd(18,35);
+    s.ga=(s.ga||0)+goals; s.saves=(s.saves||0)+saves; s.sa=(s.sa||0)+goals+saves;
+  }
+}
+
+function incrementPlayoffGP(team){
+  team.roster.forEach(p=>{
+    if(!p.playoffStats) p.playoffStats = freshPlayoffStats(p.pos);
+    p.playoffStats.gp = (p.playoffStats.gp||0)+1;
+  });
+}
+
+function simSeries(series){
+  // Best of 7 — uses playoff stat tracking
+  while(series.homeW < 4 && series.awayW < 4){
+    const home = getTeamByName(series.home);
+    const away = getTeamByName(series.away);
+    const g = simPlayoffGame(home, away);
+    if(g.result === 'W') series.homeW++;
+    else series.awayW++;
+  }
+  series.winner = series.homeW > series.awayW ? series.home : series.away;
+  series.done = true;
+}
+
+function advancePlayoffs(){
+  const bracket = state.bracket;
+  const currentRound = bracket.rounds[bracket.rounds.length - 1];
+  const allDone = currentRound.every(s => s.done);
+  if(!allDone){ alert('Sim all current series first!'); return; }
+  // Check if finals are done
+  if(currentRound.length === 1 && allDone){
+    bracket.champion = currentRound[0].winner;
+    showFlash('🏆 Champion!', bracket.champion + ' wins!', 'win');
+    state.log.push(`🏆 ${bracket.champion} wins the Stanley Cup!`);
+    renderPlayoffs();
+    return;
+  }
+  // Group winners by conf and advance
+  const winners = currentRound.map(s => ({ conf: s.conf, name: s.winner }));
+  // If 4 series (first round) -> 2 series per conf (semis), if 2 -> conf finals, if 2 conf finals -> Stanley Cup
+  let nextRound = [];
+  if(currentRound.length >= 4){
+    // Pair up winners within each conf
+    const byConf = {};
+    winners.forEach(w => { if(!byConf[w.conf]) byConf[w.conf]=[]; byConf[w.conf].push(w.name); });
+    Object.entries(byConf).forEach(([conf, names])=>{
+      for(let i=0;i<names.length;i+=2){
+        if(names[i+1]) nextRound.push({ conf, home:names[i], away:names[i+1], homeW:0, awayW:0, done:false, winner:null });
+      }
+    });
+  } else {
+    // Conference finals -> Stanley Cup final
+    nextRound = [{ conf:'Final', home:winners[0].name, away:winners[1].name, homeW:0, awayW:0, done:false, winner:null }];
+  }
+  bracket.rounds.push(nextRound);
+  renderAll();
+}
+
+function simAllSeries(){
+  const bracket = state.bracket;
+  const currentRound = bracket.rounds[bracket.rounds.length - 1];
+  currentRound.forEach(s => { if(!s.done) simSeries(s); });
+  renderPlayoffs();
+}
+
+function renderPlayoffs(){
+  if(!state || !state.myTeam || !gameStarted) return;
+  const el = document.getElementById('playoffs-body');
+  if(!state.bracket){
+    el.innerHTML = `<div style="color:var(--text2);font-size:14px;padding:20px 0;">⏳ Complete the regular season to unlock the playoffs.</div>
+    <button class="btn btn-gold" style="margin-top:12px;" onclick="startPlayoffs()">Force Generate Bracket</button>`;
+    return;
+  }
+  const bracket = state.bracket;
+  const roundNames = ['First Round','Second Round','Conference Finals','Stanley Cup Final'];
+  let html = '';
+  if(bracket.champion){
+    html += `<div style="text-align:center;padding:20px 20px 8px;font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:var(--gold);">🏆 ${bracket.champion}</div>
+    <div style="text-align:center;color:var(--text2);font-size:13px;margin-bottom:12px;">Stanley Cup Champions</div>
+    <div style="text-align:center;margin-bottom:20px;">
+      <button class="btn btn-gold" onclick="startOffseason()">Begin Offseason →</button>
+    </div>`;
+  }
+  // Sim controls
+  const currentRound = bracket.rounds[bracket.rounds.length-1];
+  const allDone = currentRound.every(s=>s.done);
+  if(!bracket.champion){
+    html += `<div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-gold" onclick="simAllSeries()">Sim All Series</button>
+      ${allDone ? `<button class="btn btn-red" onclick="advancePlayoffs()">Advance Round →</button>` : ''}
+    </div>`;
+  }
+  bracket.rounds.forEach((round, ri)=>{
+    html += `<div class="bracket-round"><div class="bracket-round-title">${roundNames[ri]||'Round '+(ri+1)}</div>`;
+    // Group by conf
+    const confs = [...new Set(round.map(s=>s.conf))];
+    confs.forEach(conf=>{
+      if(confs.length > 1) html += `<div class="conf-label">${conf}</div>`;
+      round.filter(s=>s.conf===conf).forEach(s=>{
+        const myTeamIn = s.home===state.myTeam.name||s.away===state.myTeam.name;
+        html += `<div class="bracket-series" style="${myTeamIn?'border-color:rgba(41,128,185,0.5);':''}">
+          <div class="bracket-team ${s.done&&s.winner!==s.home?'eliminated':s.done?'winner':''}">${s.home}${s.home===state.myTeam.name?' ⭐':''}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div class="bracket-score" style="color:${s.homeW>s.awayW?'#2ecc71':'var(--text2)'}">${s.homeW}</div>
+            <div class="bracket-vs">vs</div>
+            <div class="bracket-score" style="color:${s.awayW>s.homeW?'#2ecc71':'var(--text2)'}">${s.awayW}</div>
+          </div>
+          <div class="bracket-team ${s.done&&s.winner!==s.away?'eliminated':s.done?'winner':''}" style="text-align:right;">${s.away}${s.away===state.myTeam.name?' ⭐':''}</div>
+        </div>`;
+      });
+    });
+    html += `</div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ---- offseason ----
+// ================================================================
+// PROSPECT & DRAFT SYSTEM — Role-Based Hidden Potential
+// ================================================================
+
+// True potential tiers by position group
+// ----------------------------------------------------------------
+// TALENT DISTRIBUTION — realistic hockey ecosystem
+// Franchise = ~1 per league, Elite = ~10-15 league-wide
+// Most players are middle-tier; superstars are memorable
+// Goalies: heavily restricted — most teams have 1 true starter
+// ----------------------------------------------------------------
+
+
+// Draft class strength modifier — makes some years deeper or weaker
+function draftClassStrength(){
+  // Smaller modifiers — class quality shifts distribution but doesn't dominate
+  const roll = rnd(1,100);
+  if(roll <= 5)  return { label:'Exceptional', mod:1.12 };
+  if(roll <= 20) return { label:'Strong',       mod:1.06 };
+  if(roll <= 65) return { label:'Average',      mod:1.00 };
+  if(roll <= 85) return { label:'Weak',         mod:0.94 };
+  return              { label:'Very Weak',      mod:0.88 };
+}
+
+// Weighted random pick from tier list
+function pickTier(tiers){
+  const total = tiers.reduce((s,t)=>s+t.weight, 0);
+  let r = Math.random() * total;
+  for(const t of tiers){ r -= t.weight; if(r <= 0) return t; }
+  return tiers[tiers.length-1];
+}
