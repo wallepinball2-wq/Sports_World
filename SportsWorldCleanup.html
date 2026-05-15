@@ -2972,3 +2972,233 @@ function contractAcceptance(p, offeredSal, offeredYrs){
   if(salRatio >= threshold-0.25 && yrDiff >= -1) return { accepts: Math.random()<0.5*will, mood: '😐 Considering...' };
   return { accepts: false, mood: '❌ Wants more.' };
 }
+
+    function buildYearBreakdown(sal, yrs, startSeason, startAge){
+  let rows = '';
+  for(let i=0; i<yrs; i++){
+    const yr = startSeason + i;
+    const age = startAge + i;
+    const projCap = Math.round((league.salaryCap + i*3)*10)/10;
+    const pct = (sal/projCap*100).toFixed(2);
+    rows += `<div style="display:flex;align-items:center;padding:7px 12px;border-bottom:1px solid rgba(100,160,220,0.07);${i===0?'background:rgba(41,128,185,0.05);':''}">
+      <div style="flex:1;color:${i===0?'var(--ice)':'var(--text2)'};">Season ${yr} ${i===0?'<span style="font-size:10px;color:var(--accent);">(current)</span>':''}</div>
+      <div style="width:40px;text-align:center;color:var(--text2);font-size:11px;">Age ${age}</div>
+      <div style="width:80px;text-align:right;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;">$${sal.toFixed(2)}M</div>
+      <div style="width:60px;text-align:right;color:var(--text2);font-size:11px;">${pct}%</div>
+    </div>`;
+  }
+  return rows;
+}
+
+function updateContractPreview(){
+  if(!signTarget) return;
+  const sal = Math.max(0.775, parseFloat(document.getElementById('sign-salary').value)||0);
+  const yrs = Math.max(1, Math.min(8, parseInt(document.getElementById('sign-years').value)||1));
+  const pct = salaryToCapPct(sal);
+  document.getElementById('sign-cap-pct').textContent = pct.toFixed(2);
+  document.getElementById('contract-total').textContent = `$${(sal*yrs).toFixed(2)}M`;
+  // Year breakdown
+  const breakdown = document.getElementById('contract-year-breakdown');
+  if(breakdown) breakdown.innerHTML = buildYearBreakdown(sal, yrs, state.season, signTarget.age);
+  // Cap after
+  const capAfter = capLeft() - sal;
+  const capEl = document.getElementById('contract-cap-left');
+  capEl.textContent = `$${capAfter.toFixed(2)}M`;
+  capEl.style.color = capAfter < 0 ? 'var(--red2)' : '#2ecc71';
+  // Asking
+  const ask = playerAsk(signTarget);
+  const clauseStr = ask.clause ? ` + ${ask.clause}` : '';
+  document.getElementById('contract-asking').textContent = `$${ask.salary.toFixed(2)}M / yr — ${ask.years} year${ask.years>1?'s':''}${clauseStr} (${salaryToCapPct(ask.salary).toFixed(2)}% cap)`;
+  // Reaction
+  const { mood } = contractAcceptance(signTarget, sal, yrs);
+  const reactionEl = document.getElementById('contract-reaction');
+  reactionEl.textContent = mood;
+  const isGood = mood.startsWith('😄')||mood.startsWith('🤝');
+  const isMid = mood.startsWith('😐');
+  reactionEl.style.background = isGood?'rgba(46,204,113,0.1)':isMid?'rgba(243,156,18,0.1)':'rgba(192,57,43,0.1)';
+  reactionEl.style.color = isGood?'#2ecc71':isMid?'var(--gold)':'var(--red2)';
+}
+
+function openSign(id){
+  signTarget = state.fa.find(p=>p.id===id);
+  if(!signTarget) return;
+  window._resignMode = !!signTarget._myTeam;
+  const ask = playerAsk(signTarget);
+  document.getElementById('contract-title').textContent = 'Sign Player';
+  document.getElementById('sign-info').innerHTML = `<strong>${signTarget.name}</strong> &nbsp;·&nbsp; ${signTarget.pos} &nbsp;·&nbsp; Age ${signTarget.age} &nbsp;·&nbsp; OVR ${signTarget.ovr}${signTarget.potential ? ` &nbsp;·&nbsp; Pot <span class="prospect-potential pot-${signTarget.potential}">${signTarget.potential}</span>` : ''}`;
+  if(isELCEligible(signTarget)){
+    document.getElementById('sign-salary').value = ELC.maxSalary.toFixed(3);
+    document.getElementById('sign-salary').max = ELC.maxSalary;
+    document.getElementById('sign-years').value = Math.min(ask.years, ELC.maxYears);
+    document.getElementById('sign-years').max = ELC.maxYears;
+    document.getElementById('sign-years-max').textContent = ELC.maxYears;
+    document.getElementById('sign-warn').textContent = `ELC: max $${ELC.maxSalary}M / ${ELC.maxYears} years`;
+  } else {
+    document.getElementById('sign-salary').value = ask.salary.toFixed(3);
+    document.getElementById('sign-salary').max = 14;
+    document.getElementById('sign-years').value = ask.years;
+    document.getElementById('sign-years').max = 8;
+    document.getElementById('sign-years-max').textContent = 8;
+    document.getElementById('sign-warn').textContent = '';
+  }
+  updateContractPreview();
+  signClause = null;
+  setSignClause(null);
+  document.getElementById('modal-sign').classList.add('open');
+}
+
+function confirmSign(){
+  const p = signTarget;
+  const yrs = parseInt(document.getElementById('sign-years').value);
+  const sal = parseFloat(document.getElementById('sign-salary').value);
+  if(sal > capLeft()+0.05){
+    document.getElementById('sign-warn').textContent = 'Not enough cap space!'; return;
+  }
+  const { accepts, mood } = contractAcceptance(p, sal, yrs);
+  if(!accepts){
+    document.getElementById('sign-warn').textContent = mood + ' Increase your offer.'; return;
+  }
+  if(window._resignMode){
+    p.years = yrs;
+    p.salary = sal;
+    p.capPct = salaryToCapPct(sal);
+    p.isELC = false;
+    p._resigned = true;
+    p._myTeam = false;
+    delete p.elcJustExpired;
+    state.fa = state.fa.filter(x => x.id !== p.id);
+    state.myTeam.roster.push(p);
+    clearFloorAdjustments(state.myTeam);
+    state.log.push(`✍️ Re-signed ${p.name} (OVR ${p.ovr}) — ${yrs}yr @ $${sal.toFixed(2)}M`);
+    console.log(`[Player] ${p.name} re-signed with ${state.myTeam.name} — $${sal.toFixed(2)}M/${yrs}yr`);
+    window._resignMode = false;
+    closeModal('modal-sign');
+    renderResign();
+    return;
+  }
+  p.years = yrs;
+  p.salary = sal;
+  p.capPct = salaryToCapPct(sal);
+  p.isELC = !!(isELCEligible(p) && sal <= ELC.maxSalary + 0.001 && yrs <= ELC.maxYears);
+  state.myTeam.roster.push(p);
+  state.fa = state.fa.filter(x=>x.id!==p.id);
+  delete p.elcJustExpired;
+  state.fa.push(newFAPlayer());
+  // Clear floor adjustments since real payroll changed
+  clearFloorAdjustments(state.myTeam);
+  state.log.push(`✍️ Signed ${p.name} (OVR ${p.ovr}) — ${yrs}yr @ $${sal.toFixed(2)}M (${salaryToCapPct(sal).toFixed(2)}% cap)`);
+  closeModal('modal-sign');
+  showFlash('Signed!', `${p.name} joins the team.`, 'otl');
+  renderAll();
+}
+
+// ---- extend (roster players) ----
+let extendTarget = null;
+function openExtend(id){
+  extendTarget = state.myTeam.roster.find(p=>p.id===id);
+  if(!extendTarget) return;
+  // Block extensions on ELC players
+  if(isELC(extendTarget)){
+    alert(`${extendTarget.name} is on an Entry Level Contract (ELC) and cannot be extended until it expires.`);
+    return;
+  }
+  const ask = playerAsk(extendTarget);
+  document.getElementById('extend-info').innerHTML = `<strong>${extendTarget.name}</strong> &nbsp;·&nbsp; ${extendTarget.pos} &nbsp;·&nbsp; Age ${extendTarget.age} &nbsp;·&nbsp; OVR ${extendTarget.ovr} &nbsp;·&nbsp; <span style="color:var(--text2);">${extendTarget.years}yr remaining — extension adds on top</span>`;
+  document.getElementById('extend-salary').value = ask.salary.toFixed(3);
+  document.getElementById('extend-years').value = ask.years;
+  document.getElementById('extend-warn').textContent = '';
+  updateExtendPreview();
+  extendClause = null;
+  setExtendClause(null);
+  document.getElementById('modal-extend').classList.add('open');
+}
+
+function updateExtendPreview(){
+  if(!extendTarget) return;
+  const sal = Math.max(0.775, parseFloat(document.getElementById('extend-salary').value)||0);
+  const yrs = Math.max(1, Math.min(8, parseInt(document.getElementById('extend-years').value)||1));
+  const pct = salaryToCapPct(sal);
+  document.getElementById('extend-cap-pct').textContent = pct.toFixed(2);
+  document.getElementById('extend-total').textContent = `$${(sal*yrs).toFixed(2)}M`;
+  // Year breakdown — starts after current contract ends
+  const breakdown = document.getElementById('extend-year-breakdown');
+  if(breakdown) breakdown.innerHTML = buildYearBreakdown(sal, yrs, state.season + extendTarget.years, extendTarget.age + extendTarget.years);
+  // Cap after
+  const capAfter = capLeft() - sal;
+  const capEl = document.getElementById('extend-cap-left');
+  capEl.textContent = `$${capAfter.toFixed(2)}M`;
+  capEl.style.color = capAfter < 0 ? 'var(--red2)' : '#2ecc71';
+  // Asking
+  const ask = playerAsk(extendTarget);
+  const extClauseStr = ask.clause ? ` + ${ask.clause}` : '';
+  document.getElementById('extend-asking').textContent = `$${ask.salary.toFixed(2)}M / yr — ${ask.years} year${ask.years>1?'s':''}${extClauseStr} (${salaryToCapPct(ask.salary).toFixed(2)}% cap)`;
+  // Reaction
+  const { mood } = contractAcceptance(extendTarget, sal, yrs);
+  const reactionEl = document.getElementById('extend-reaction');
+  reactionEl.textContent = mood;
+  const isGood = mood.startsWith('😄')||mood.startsWith('🤝');
+  const isMid = mood.startsWith('😐');
+  reactionEl.style.background = isGood?'rgba(46,204,113,0.1)':isMid?'rgba(243,156,18,0.1)':'rgba(192,57,43,0.1)';
+  reactionEl.style.color = isGood?'#2ecc71':isMid?'var(--gold)':'var(--red2)';
+
+}
+
+function confirmExtend(){
+  if(!extendTarget) return;
+  const sal = parseFloat(document.getElementById('extend-salary').value);
+  const yrs = parseInt(document.getElementById('extend-years').value);
+  if(sal > capLeft() + extendTarget.salary + 0.05){
+    document.getElementById('extend-warn').textContent = 'Not enough cap space!'; return;
+  }
+  const { accepts, mood } = contractAcceptance(extendTarget, sal, yrs);
+  if(!accepts){
+    document.getElementById('extend-warn').textContent = mood + ' Increase your offer.'; return;
+  }
+  // Store the new deal as a pending extension — salary/clause kick in after
+  // the current contract expires, not immediately. Years are added now so
+  // the player stays on the roster through the full term.
+  const originalYears = extendTarget.years;
+  extendTarget.pendingExtension = {
+    salary: sal,
+    capPct: salaryToCapPct(sal),
+    years: yrs,
+    clause: extendClause || null,
+    clauseYears: extendClause ? yrs : 0,
+    ntcList: (extendClause==='NTC'||extendClause==='M-NMC') ? generateNTCList() : null,
+  };
+  extendTarget.years = originalYears + yrs;
+  extendClause = null;
+  const extClauseStr = extendTarget.pendingExtension.clause ? ` [${extendTarget.pendingExtension.clause}]` : '';
+  state.log.push(`📝 Extended ${extendTarget.name} (OVR ${extendTarget.ovr}) — ${originalYears}yr @ $${extendTarget.salary.toFixed(2)}M current, then ${yrs}yr @ $${sal.toFixed(2)}M${extClauseStr}`);
+  closeModal('modal-extend');
+  showFlash('Extended!', `${extendTarget.name} signed a new deal.`, 'otl');
+  renderAll();
+}
+function openRelease(id){
+  releaseTarget = state.myTeam.roster.find(p=>p.id===id);
+  document.getElementById('release-info').innerHTML = `<strong>${releaseTarget.name}</strong> (${releaseTarget.pos}, OVR ${releaseTarget.ovr}, $${releaseTarget.salary.toFixed(1)}M/yr)`;
+  document.getElementById('modal-release').classList.add('open');
+}
+function confirmRelease(){
+  const p = releaseTarget;
+  state.myTeam.roster = state.myTeam.roster.filter(x=>x.id!==p.id);
+  state.fa.push({...p, years:1});
+  autoSetLines();
+  state.log.push(`🗑️ Released ${p.name} (OVR ${p.ovr}) — cap cleared`);
+  closeModal('modal-release');
+  renderAll();
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  if(id === 'modal-sign') window._resignMode = false;
+}
+
+function showPauseMenu(){
+  document.getElementById('modal-pause').classList.add('open');
+}
+
+function quitToMainMenu(){
+  saveGame();
+  closeModal('modal-pause');
+  showMenu();
+}
