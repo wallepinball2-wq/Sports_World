@@ -1798,3 +1798,303 @@ function loadThemeFromStorage(){
 function applyOvrTierCSS() {
   let css = '';
   OVR_TIERS.forEach((tier, i) => {
+    // Generates CSS classes: .ovr-tier-0, .ovr-tier-1, etc.
+    css += `.ovr-tier-${i} { color: ${tier.color} !important; }\n`;
+  });
+  
+  let styleEl = document.getElementById('ovr-tier-styles');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'ovr-tier-styles';
+    document.head.appendChild(styleEl);
+  }
+  styleEl.innerHTML = css;
+}
+
+function getOvrTierIndex(ovr) {
+  for (let i = 0; i < OVR_TIERS.length; i++) {
+    if (ovr >= OVR_TIERS[i].min) return i;
+  }
+  return OVR_TIERS.length - 1;
+}
+
+function ovrCell(ovr) {
+  const tier = getOvrTierIndex(ovr);
+  return `<span class="ovr-num ovr-tier-${tier}">${ovr}</span>`;
+}
+
+function getThemeColorMapFromDOM(){
+  const root = document.documentElement;
+  const map = {};
+  THEME_COLOR_KEYS.forEach(k => {
+    let v = getComputedStyle(root).getPropertyValue(k).trim();
+    if(!v) v = THEME_COLOR_DEFAULTS[k];
+    map[k] = normalizeHexColor(v);
+  });
+  return map;
+}
+
+function syncThemeColorPickers(){
+  const map = getThemeColorMapFromDOM();
+  THEME_COLOR_KEYS.forEach(k => {
+    const id = 'theme-color-' + k.replace(/^--/, '');
+    const el = document.getElementById(id);
+    if(el) el.value = map[k];
+  });
+}
+
+function bindThemeColorEditor(){
+  THEME_COLOR_KEYS.forEach(k => {
+    const id = 'theme-color-' + k.replace(/^--/, '');
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('input', () => {
+      const root = document.documentElement;
+      root.style.setProperty(k, el.value);
+      const out = {};
+      THEME_COLOR_KEYS.forEach(key => {
+        out[key] = getComputedStyle(root).getPropertyValue(key).trim() || THEME_COLOR_DEFAULTS[key];
+      });
+      try { localStorage.setItem('hockeyGMThemeColors', JSON.stringify(out)); } catch(e){}
+    });
+  });
+}
+
+function resetThemeColors(){
+  const root = document.documentElement;
+  try { localStorage.removeItem('hockeyGMThemeColors'); } catch(e){}
+  THEME_COLOR_KEYS.forEach(k => {
+    root.style.removeProperty(k);
+    root.style.setProperty(k, THEME_COLOR_DEFAULTS[k]);
+  });
+  syncThemeColorPickers();
+}
+
+function updateGoalieSplit(val){
+  val = parseInt(val);
+  league.starterSharePct = val;
+  try { localStorage.setItem('goalieSplit', val); } catch(e){}
+  const starterGames = Math.round(82 * val / 100);
+  const backupGames = 82 - starterGames;
+  const lbl = document.getElementById('goalie-split-label');
+  const sg = document.getElementById('goalie-split-games');
+  const bg = document.getElementById('goalie-split-backup-games');
+  if(lbl) lbl.textContent = `${val}% / ${100-val}%`;
+  if(sg) sg.textContent = starterGames;
+  if(bg) bg.textContent = backupGames;
+}
+
+function syncGoalieSplitUI(){
+  const saved = parseInt(localStorage.getItem('goalieSplit') || '65');
+  league.starterSharePct = saved;
+  const slider = document.getElementById('goalie-split-slider');
+  if(slider) slider.value = saved;
+  updateGoalieSplit(saved);
+}
+
+function renderOvrTierEditor() {
+  const container = document.getElementById('ovr-tier-editor');
+  if (!container) return;
+
+  // 1. Build the rows for each tier
+  container.innerHTML = OVR_TIERS.map((tier, i) => `
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; background:rgba(255,255,255,0.03); padding:8px; border-radius:4px;">
+      <span style="font-size:12px; font-weight:700; min-width:45px; color:var(--text2);">${tier.min}+</span>
+      <input type="text" value="${tier.label}" id="ovr-label-${i}" style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:var(--text); padding:4px; font-size:12px;">
+      <input type="color" value="${tier.color}" id="ovr-color-${i}" style="width:40px; height:24px; border:none; cursor:pointer; background:none;">
+    </div>
+  `).join('');
+
+  // 2. Add the Listeners INSIDE a forEach loop so 'i' is defined correctly
+  OVR_TIERS.forEach((tier, i) => {
+    // Listen for Label changes
+    const labelInput = document.getElementById(`ovr-label-${i}`);
+    if (labelInput) {
+      labelInput.addEventListener('input', (e) => {
+        OVR_TIERS[i].label = e.target.value;
+        saveOvrTiers(OVR_TIERS);
+      });
+    }
+
+    // Listen for Color changes
+    const colorInput = document.getElementById(`ovr-color-${i}`);
+    if (colorInput) {
+      colorInput.addEventListener('input', (e) => {
+        OVR_TIERS[i].color = e.target.value;
+        saveOvrTiers(OVR_TIERS);
+        applyOvrTierCSS(); // This refreshes the colors on the screen instantly!
+      });
+    }
+  });
+}
+
+// Around Line 1874
+document.getElementById(`ovr-color-${i}`).addEventListener('input', (e) => {
+    OVR_TIERS[i].color = e.target.value;
+    saveOvrTiers(OVR_TIERS);
+    applyOvrTierCSS(); // <--- ADD THIS LINE HERE
+});
+
+function resetOvrTiers(){
+  OVR_TIERS = OVR_TIER_DEFAULTS.map(t => ({...t}));
+  saveOvrTiers(OVR_TIERS);
+  applyOvrTierCSS();
+  renderOvrTierEditor();
+}
+
+function showSettings(){
+  syncThemeColorPickers();
+  syncGoalieSplitUI();
+  renderOvrTierEditor();
+  document.getElementById('modal-settings').classList.add('open');
+}
+
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove('open');
+    // This ensures that if the modal used a 'display: flex' style, it hides properly
+    if (modal.style.display === 'flex') {
+      modal.style.display = 'none';
+    }
+  }
+}
+
+// ---- Menu Navigation ----
+function showMenu(){
+  document.getElementById('screen-menu').classList.add('active');
+  document.getElementById('screen-teamsel').classList.remove('active');
+  document.getElementById('app').style.display = 'none';
+}
+
+function loadGame(){
+  // Check localStorage for saved game
+  const saved = localStorage.getItem('hockeyGMSave');
+  if(saved){
+    try {
+      const data = JSON.parse(saved);
+      // Restore state
+      state = data;
+      gameState.selectedTeam = state.myTeam.name;
+      startGame(state.myTeam.name, true);
+      console.log('[Load] Game loaded:', gameState.selectedTeam);
+    } catch(e){ alert('Save file corrupted. Start a new game.'); }
+  } else {
+    alert('No saved game found. Start a new game!');
+  }
+}
+
+let selectedTeamName = null;
+let teamPreviewCache = {};
+
+function renderTeamGrid(){
+  const grid = document.getElementById('teamsel-grid');
+  grid.innerHTML = TEAM_NAMES.map(name => {
+    const data = TEAM_DATA[name] || { city: name, philosophy:'Balanced', philCode:'B' };
+    const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2);
+    return `<div class="team-card ${selectedTeamName===name?'selected':''}" onclick="selectTeamCard('${name}')">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <div style="width:36px;height:36px;background:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;flex-shrink:0;">${initials}</div>
+        <div>
+          <div class="team-card-name">${name}</div>
+          <div class="team-card-city">${data.city}</div>
+        </div>
+      </div>
+      <span class="team-card-phil phil-${data.philCode}">${data.philosophy}</span>
+    </div>`;
+  }).join('');
+}
+// --- SPECIALIZED ROSTER TIERS ---
+
+// REBUILDING: Lower overalls, but younger ages (more "potential" room)
+const rebuildingFwdTiers = [
+  [81, 84, 18, 22], [79, 82, 19, 23], [77, 80, 19, 24], 
+  [75, 78, 20, 25], [74, 77, 21, 26], [72, 75, 22, 27],
+  [70, 74, 23, 28], [68, 72, 20, 30], [66, 70, 18, 32],
+  [65, 68, 18, 32], [65, 68, 18, 32], [65, 68, 18, 32]
+];
+
+// OFFENSIVE/CONTENDER: High-end prime talent
+const offensiveFwdTiers = [
+  [90, 96, 23, 29], [87, 91, 22, 31], [85, 89, 22, 31],
+  [84, 87, 24, 32], [83, 86, 24, 32], [82, 85, 24, 33],
+  [81, 84, 25, 33], [80, 83, 25, 34], [79, 82, 20, 35],
+  [77, 80, 20, 35], [76, 79, 20, 35], [74, 78, 20, 35]
+];
+
+// DEFENSIVE: Slightly lower top-end forwards, but usually paired with better D
+const defensiveFwdTiers = [
+  [86, 91, 24, 30], [84, 88, 24, 32], [83, 86, 24, 32],
+  [82, 85, 25, 33], [81, 84, 25, 33], [80, 83, 25, 34],
+  [79, 82, 26, 35], [78, 81, 26, 35], [77, 80, 20, 35],
+  [76, 79, 20, 35], [75, 78, 20, 35], [74, 77, 20, 35]
+];
+
+function selectTeamCard(name){
+  selectedTeamName = name;
+  if(!teamPreviewCache[name]) teamPreviewCache[name] = newTeam(name);
+  const data = TEAM_DATA[name] || { city:name, philosophy:'Balanced' };
+  document.getElementById('teamsel-info').innerHTML = `<strong>${name}</strong> · ${data.city} · <span style="color:var(--gold)">${data.philosophy}</span>`;
+  const btn = document.getElementById('teamsel-confirm');
+  btn.style.opacity = '1';
+  btn.style.pointerEvents = 'auto';
+  renderTeamGrid();
+  renderTeamPreview(name, teamPreviewCache[name]);
+  console.log('[Team Select] Selected:', name, data);
+}
+
+function showTeamSelect() {
+  // 1. Randomize the team philosophies for this new session
+  randomizeLeagueIdentities();
+  
+  // 2. Clear the cache so it doesn't show players from the previous time you clicked "New Game"
+  teamPreviewCache = {}; 
+
+  document.getElementById('screen-menu').classList.remove('active');
+  document.getElementById('screen-teamsel').classList.add('active');
+  
+  // 3. Re-render the grid so the new philosophies (colors/text) show up
+  renderTeamGrid();
+  
+  // Reset the preview to null so you have to click a team to see the new roster
+  renderTeamPreview(selectedTeamName, selectedTeamName ? teamPreviewCache[selectedTeamName] : null);
+}
+
+function teamAverage(roster, positions){
+  const filtered = roster.filter(p => positions.includes(p.pos));
+  if(!filtered.length) return 0;
+  return Math.round(filtered.reduce((sum,p)=>sum+p.ovr,0)/filtered.length);
+}
+
+function renderTeamPreview(name, team){
+  const statOvr = document.getElementById('teamsel-ovr');
+  const statFwd = document.getElementById('teamsel-fwd');
+  const statDef = document.getElementById('teamsel-def');
+  const statGoal = document.getElementById('teamsel-goal');
+  const statRosterSize = document.getElementById('teamsel-roster-size');
+  const statAvgAge = document.getElementById('teamsel-avg-age');
+  const tbody = document.getElementById('teamsel-roster');
+  if(!name){
+    if(statOvr) statOvr.textContent = '—';
+    if(statFwd) statFwd.textContent = '—';
+    if(statDef) statDef.textContent = '—';
+    if(statGoal) statGoal.textContent = '—';
+    if(statRosterSize) statRosterSize.textContent = '—';
+    if(statAvgAge) statAvgAge.textContent = '—';
+    if(tbody) tbody.innerHTML = `<tr><td colspan="5" style="color:var(--text2);font-size:13px;text-align:center;padding:18px 0;">Select a team to preview its roster and overall ratings.</td></tr>`;
+    return;
+  }
+  team = team || teamPreviewCache[name] || newTeam(name);
+  const ovr = teamOVR(team.roster);
+  const fwd = teamAverage(team.roster, ['C','LW','RW']);
+  const def = teamAverage(team.roster, ['LD','RD']);
+  const goal = teamAverage(team.roster, ['G']);
+  const rosterSize = team.roster.length;
+  const avgAge = Math.round(team.roster.reduce((sum,p)=>sum+p.age,0)/team.roster.length);
+  if(statOvr) statOvr.textContent = ovr || '—';
+  if(statFwd) statFwd.textContent = fwd || '—';
+  if(statDef) statDef.textContent = def || '—';
+  if(statGoal) statGoal.textContent = goal || '—';
+  if(statRosterSize) statRosterSize.textContent = rosterSize || '—';
+  if(statAvgAge) statAvgAge.textContent = avgAge || '—';
+  if(tbody){
