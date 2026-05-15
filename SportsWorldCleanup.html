@@ -598,3 +598,303 @@ function showTeamSelect() {
   <header>
     <div style="display:flex;align-items:center;gap:12px;">
       <div class="team-logo" id="hdr-logo">IW</div>
+      <div class="team-info">
+        <h1 id="hdr-name">Ironwood Wolves</h1>
+        <div class="sub" id="hdr-sub">Season <span id="hdr-season">1</span> · General Manager</div>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="hstat"><div class="hstat-val" id="hdr-record">0-0-0</div><div class="hstat-label">Record</div></div>
+      <div class="hstat"><div class="hstat-val" id="hdr-pts">0</div><div class="hstat-label">Points</div></div>
+      <div class="hstat"><div class="hstat-val" id="hdr-week">Wk 1</div><div class="hstat-label">Week</div></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="saveGame()" style="font-size:12px;padding:6px 12px;">💾 Save</button>
+      <button class="btn" onclick="showPauseMenu()">⏸️ Pause</button>
+      <button class="btn" onclick="simWeek()">▶ Sim Week</button>
+      <button class="btn btn-red" onclick="simSeason()">▶▶ Sim Season</button>
+    </div>
+  </header>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-card-label">Cap Space</div>
+      <div class="stat-card-val" id="sc-cap">$42.0M</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Team OVR</div>
+      <div class="stat-card-val" id="sc-ovr">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Roster Size</div>
+      <div class="stat-card-val" id="sc-roster">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Morale</div>
+      <div class="stat-card-val" id="sc-morale">😐</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Standing</div>
+      <div class="stat-card-val" id="sc-standing">—</div>
+    </div>
+  </div>
+
+  <!-- NAV BAR -->
+  <div class="nav-bar">
+    <button class="nav-group-btn active" id="navg-team" onclick="showNavGroup('team')">🏒 Team</button>
+    <button class="nav-group-btn" id="navg-league" onclick="showNavGroup('league')">🌍 League</button>
+    <button class="nav-group-btn" id="navg-transactions" onclick="showNavGroup('transactions')">🔄 Transactions</button>
+    <button class="nav-group-btn" id="navg-management" onclick="showNavGroup('management')">🧠 Management</button>
+  </div>
+
+  <!-- TEAM SUBMENU -->
+  <div class="nav-submenu active" id="sub-team">
+    <button class="nav-sub-btn active" id="subbtn-roster" onclick="showTab('roster')">Roster</button>
+    <button class="nav-sub-btn" id="subbtn-lines" onclick="showTab('lines')">Lines</button>
+    <button class="nav-sub-btn" id="subbtn-affiliates" onclick="showTab('affiliates')">Affiliates</button>
+    <button class="nav-sub-btn" id="subbtn-contracts" onclick="showTab('contracts')">Contracts</button>
+    <button class="nav-sub-btn" id="subbtn-log" onclick="showTab('log')">Game Log</button>
+  </div>
+
+  <!-- LEAGUE SUBMENU -->
+  <div class="nav-submenu" id="sub-league">
+    <button class="nav-sub-btn" id="subbtn-standings" onclick="showTab('standings')">Standings</button>
+    <button class="nav-sub-btn" id="subbtn-playoffs" onclick="showTab('playoffs')">Playoffs</button>
+    <button class="nav-sub-btn" id="subbtn-power" onclick="showTab('power')">Power Rankings</button>
+    <button class="nav-sub-btn" id="subbtn-calendar" onclick="showTab('calendar')">📅 Calendar</button>
+    <button class="nav-sub-btn" id="subbtn-leaders" onclick="showTab('leaders')">League Leaders</button>
+  </div>
+
+  <!-- TRANSACTIONS SUBMENU -->
+  <div class="nav-submenu" id="sub-transactions">
+    <button class="nav-sub-btn" id="subbtn-fa" onclick="showTab('fa')">Free Agents</button>
+    <button class="nav-sub-btn" id="subbtn-trade" onclick="showTab('trade')">Trade Center</button>
+    <button class="nav-sub-btn offseason-only" id="subbtn-resign" onclick="showTab('resign')">Re-Sign</button>
+    <button class="nav-sub-btn offseason-only" id="subbtn-draft" onclick="showTab('draft')">Draft</button>
+    <button class="nav-sub-btn future" title="Coming soon">Waivers</button>
+  </div>
+
+  <!-- MANAGEMENT SUBMENU -->
+  <div class="nav-submenu" id="sub-management">
+    <button class="nav-sub-btn future" title="Coming soon">Staff</button>
+    <button class="nav-sub-btn future" title="Coming soon">Finances</button>
+    <button class="nav-sub-btn future" title="Coming soon">Team Strategy</button>
+    <button class="nav-sub-btn future" title="Coming soon">Settings</button>
+  </div>
+
+  <!-- ROSTER -->
+  <div id="panel-roster" class="tab-panel active">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th onclick="sortRoster('name')" style="cursor:pointer;">Player <span id="sort-roster-name"></span></th>
+            <th onclick="sortRoster('pos')" style="cursor:pointer;">Pos <span id="sort-roster-pos">↕</span></th>
+            <th onclick="sortRoster('age')" style="cursor:pointer;">Age <span id="sort-roster-age"></span></th>
+            <th onclick="sortRoster('ovr')" style="cursor:pointer;">OVR <span id="sort-roster-ovr"></span></th>
+            <th>Projection</th>
+            <th onclick="sortRoster('salary')" style="cursor:pointer;">Salary <span id="sort-roster-salary"></span></th>
+            <th onclick="sortRoster('years')" style="cursor:pointer;">Yrs Left <span id="sort-roster-years"></span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="roster-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FA -->
+  <div id="panel-fa" class="tab-panel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortFA('name')" style="cursor:pointer;">Player <span id="sort-fa-name"></span></th>
+            <th onclick="sortFA('pos')" style="cursor:pointer;">Pos <span id="sort-fa-pos"></span></th>
+            <th onclick="sortFA('age')" style="cursor:pointer;">Age <span id="sort-fa-age"></span></th>
+            <th onclick="sortFA('ovr')" style="cursor:pointer;">OVR <span id="sort-fa-ovr">↓</span></th>
+            <th>Projection</th>
+            <th onclick="sortFA('salary')" style="cursor:pointer;">Asking <span id="sort-fa-salary"></span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fa-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TRADE -->
+  <div id="panel-trade" class="tab-panel">
+    <div id="trade-body"></div>
+  </div>
+
+  <!-- STANDINGS -->
+  <div id="panel-standings" class="tab-panel">
+    <div id="standings-body"></div>
+  </div>
+
+  <!-- PLAYOFFS -->
+  <div id="panel-playoffs" class="tab-panel">
+    <div id="playoffs-body"></div>
+  </div>
+
+  <!-- POWER RANKINGS -->
+  <div id="panel-power" class="tab-panel">
+    <div id="power-body"></div>
+  </div>
+
+  <!-- LEAGUE LEADERS -->
+  <div id="panel-leaders" class="tab-panel">
+    <div id="leaders-body"></div>
+  </div>
+
+  <!-- RE-SIGN -->
+  <div id="panel-resign" class="tab-panel">
+    <div id="resign-body"></div>
+  </div>
+
+  <!-- DRAFT -->
+  <div id="panel-draft" class="tab-panel">
+    <div id="draft-body"></div>
+  </div>
+
+  <!-- LINES -->
+  <div id="panel-lines" class="tab-panel">
+    <div id="lines-body"></div>
+  </div>
+
+  <!-- CONTRACTS -->
+  <div id="panel-contracts" class="tab-panel">
+    <div id="contracts-body"></div>
+  </div>
+
+  <!-- AFFILIATES -->
+  <div id="panel-affiliates" class="tab-panel">
+    <div id="affiliates-body"></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div id="panel-calendar" class="tab-panel">
+    <div id="calendar-body"></div>
+  </div>
+
+  <!-- LOG -->
+  <div id="panel-log" class="tab-panel">
+    <div class="log-area" id="game-log">
+      <div style="color:var(--text2);font-size:13px;">No games simulated yet. Hit Sim Week to get started.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- CONTRACT NEGOTIATION MODAL — used for both sign and extend -->
+<div class="modal-overlay" id="modal-sign">
+  <div class="modal" style="width:500px;max-height:90vh;overflow-y:auto;">
+    <h2 id="contract-title">Contract Negotiation</h2>
+    <div id="sign-info" style="font-size:13px;color:var(--text2);margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);"></div>
+
+    <!-- Player asking -->
+    <div style="background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.25);border-radius:6px;padding:10px 12px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Player Asking</div>
+      <div id="contract-asking" style="font-size:14px;font-weight:600;color:var(--text);"></div>
+    </div>
+
+    <!-- Your offer inputs -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Years</label>
+        <input type="number" id="sign-years" min="1" max="8" value="3" step="1"
+          oninput="updateContractPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Max: <span id="sign-years-max">8</span> yrs</div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Annual Salary ($M)</label>
+        <input type="number" id="sign-salary" min="0.775" max="14" value="3" step="0.025"
+          oninput="updateContractPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Cap: <span id="sign-cap-pct">—</span>%</div>
+      </div>
+    </div>
+
+    <!-- Year-by-year breakdown table -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;">Year-by-Year Breakdown</span>
+        <span style="font-size:13px;font-weight:700;color:var(--gold);">Total: <span id="contract-total">—</span></span>
+      </div>
+      <div id="contract-year-breakdown" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Clause selector -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Include Clause (Optional)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="setSignClause(null)" id="sign-clause-none" class="btn btn-sm" style="border-color:var(--accent);color:var(--ice);">None</button>
+        <button onclick="setSignClause('NMC')" id="sign-clause-NMC" class="btn btn-sm">🔴 NMC</button>
+        <button onclick="setSignClause('M-NMC')" id="sign-clause-M-NMC" class="btn btn-sm">🟡 M-NMC</button>
+        <button onclick="setSignClause('NTC')" id="sign-clause-NTC" class="btn btn-sm">🔵 NTC</button>
+      </div>
+      <div id="sign-clause-desc" style="font-size:11px;color:var(--text2);margin-top:5px;"></div>
+    </div>
+
+    <!-- Cap & reaction -->
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+      <span style="color:var(--text2);">Cap space after signing</span>
+      <span id="contract-cap-left" style="font-weight:600;"></span>
+    </div>
+    <div id="contract-reaction" style="font-size:13px;min-height:22px;font-weight:600;text-align:center;padding:6px;border-radius:4px;"></div>
+    <div id="sign-warn" class="warn-text" style="text-align:center;margin-top:4px;"></div>
+
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('modal-sign')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmSign()">Make Offer</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXTEND MODAL — same layout -->
+<div class="modal-overlay" id="modal-extend">
+  <div class="modal" style="width:500px;max-height:90vh;overflow-y:auto;">
+    <h2>Extend Contract</h2>
+    <div id="extend-info" style="font-size:13px;color:var(--text2);margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);"></div>
+
+    <div style="background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.25);border-radius:6px;padding:10px 12px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Player Asking</div>
+      <div id="extend-asking" style="font-size:14px;font-weight:600;color:var(--text);"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Years to Add</label>
+        <input type="number" id="extend-years" min="1" max="8" value="3" step="1"
+          oninput="updateExtendPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Added on top of current</div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Annual Salary ($M)</label>
+        <input type="number" id="extend-salary" min="0.775" max="14" value="3" step="0.025"
+          oninput="updateExtendPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Cap: <span id="extend-cap-pct">—</span>%</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;">Year-by-Year Breakdown</span>
+        <span style="font-size:13px;font-weight:700;color:var(--gold);">Total: <span id="extend-total">—</span></span>
+      </div>
+      <div id="extend-year-breakdown" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Clause selector -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Include Clause (Optional)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="setExtendClause(null)" id="extend-clause-none" class="btn btn-sm" style="border-color:var(--accent);color:var(--ice);">None</button>
+        <button onclick="setExtendClause('NMC')" id="extend-clause-NMC" class="btn btn-sm">🔴 NMC</button>
+        <button onclick="setExtendClause('M-NMC')" id="extend-clause-M-NMC" class="btn btn-sm">🟡 M-NMC</button>
+        <button onclick="setExtendClause('NTC')" id="extend-clause-NTC" class="btn btn-sm">🔵 NTC</button>
