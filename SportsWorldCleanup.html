@@ -2398,7 +2398,302 @@ function findPlayerById(id){
     if(op) return { player: op, source: 'other', teamName: t.name };
   }
   return null;
+}
 
-</script>
-</body>
-</html>
+function openTeamRosterFromPower(teamName){
+  const team = getTeamByName(teamName);
+  if(!team || !team.roster){ return; }
+  const titleEl = document.getElementById('modal-team-roster-title');
+  const subEl = document.getElementById('modal-team-roster-sub');
+  const bodyEl = document.getElementById('modal-team-roster-body');
+  if(titleEl) titleEl.textContent = team.name;
+  const ovr = teamOVR(team.roster);
+  const rec = `${team.w||0}-${team.l||0}-${team.otl||0}`;
+  if(subEl) subEl.innerHTML = `Record <strong>${rec}</strong> · Team OVR <strong>${ovr}</strong> · Click a player for a full scouting card.`;
+
+  const sorted = [...team.roster].sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+  const rows = sorted.map((p, i) => {
+    const s = getStatLine(p);
+    const pts = p.pos === 'G'
+      ? `<span style="color:var(--text2);">${s.w||0}W ${(s.sa>0 ? ((s.saves/s.sa)*100).toFixed(1) : '0.0')}%</span>`
+      : `<span style="color:var(--text2);">${s.g||0}G-${s.a||0}A</span>`;
+    return `<tr>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);color:var(--text2);font-size:12px;">${i+1}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);font-weight:600;cursor:pointer;color:#fff;" onclick="closeModal('modal-team-roster');openPlayerPage('${p.id}')">${p.name}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);"><span class="pos-badge">${p.pos}</span></td>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);">${p.age}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);">${ovrCell(p.ovr)}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);font-size:12px;">$${p.salary.toFixed(2)}M</td>
+      <td style="padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.07);font-size:12px;">${pts}</td>
+    </tr>`;
+  }).join('');
+
+  if(bodyEl){
+    bodyEl.innerHTML = `<div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">#</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">Player</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">Pos</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">Age</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">OVR</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">Salary</th>
+        <th style="text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);">Season</th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  document.getElementById('modal-team-roster').classList.add('open');
+}
+
+function getPlayoffTeams(){
+  // Top 3 from each division + 2 wildcards per conference (16 total)
+  const playoffTeams = new Set();
+  const wildcards = {};
+  Object.entries(CONFERENCES).forEach(([conf, divs])=>{
+    const confTeams = [];
+    divs.forEach(div=>{
+      const divTeams = DIVISIONS[div].map(n=>getTeamByName(n)).filter(Boolean).sort((a,b)=>pts(b)-pts(a));
+      divTeams.slice(0,3).forEach(t=>{ playoffTeams.add(t.name); });
+      confTeams.push(...divTeams.slice(3));
+    });
+    confTeams.sort((a,b)=>pts(b)-pts(a));
+    confTeams.slice(0,2).forEach(t=>{ playoffTeams.add(t.name); wildcards[t.name]=true; });
+  });
+  return { playoffTeams, wildcards };
+}
+
+function renderStandings(){ if(!gameStarted) return;
+  const el = document.getElementById('standings-body');
+  const { playoffTeams, wildcards } = getPlayoffTeams();
+  let html = '';
+  Object.entries(CONFERENCES).forEach(([conf, divs])=>{
+    html += `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;padding:14px 0 6px;">${conf} Conference</div>`;
+    divs.forEach(div=>{
+      const divTeams = DIVISIONS[div].map(n=>getTeamByName(n)).filter(Boolean).sort((a,b)=>pts(b)-pts(a));
+      html += `<div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;padding:6px 12px 4px;font-weight:700;">${div} Division</div>`;
+      divTeams.forEach((t,i)=>{
+        const mine = t.name === state.myTeam.name;
+        const inPlayoffs = playoffTeams.has(t.name);
+        const isWild = wildcards[t.name];
+        const indicator = i<3 ? `<span style="font-size:10px;color:#2ecc71;margin-left:4px;">D</span>` : isWild ? `<span style="font-size:10px;color:var(--gold);margin-left:4px;">WC</span>` : '';
+        html += `<div class="standings-row ${mine?'mine':''}" style="${!inPlayoffs?'opacity:0.6':''}">
+          <div class="spos">${i+1}</div>
+          <div class="sname">${t.name}${mine?' ⭐':''}${indicator}</div>
+          <div class="srec">${t.w}-${t.l}-${t.otl}</div>
+          <div class="spts">${pts(t)}</div>
+        </div>`;
+      });
+    });
+  });
+  el.innerHTML = html;
+}
+
+function renderPower(){ if(!gameStarted) return;
+  const sorted = allTeams().map(t => ({...t, ovr: teamOVR(t.roster)})).sort((a,b) => b.ovr - a.ovr);
+  const el = document.getElementById('power-body');
+  const best = sorted[0].ovr;
+  const worst = sorted[sorted.length-1].ovr;
+  const span = Math.max(0.001, best - worst);
+  el.innerHTML = sorted.map((t,i) => {
+    const mine = t.name === state.myTeam.name;
+    const pct = ((t.ovr - worst) / span * 100).toFixed(0);
+    const teamJs = JSON.stringify(t.name);
+    return `<div class="standings-row ${mine?'mine':''}" role="button" tabindex="0" title="View roster"
+      onclick='openTeamRosterFromPower(${teamJs})'
+      onkeydown='if(event.key==="Enter"||event.key===" "){event.preventDefault();openTeamRosterFromPower(${teamJs});}'
+      style="gap:12px;cursor:pointer;">
+      <div class="spos">${i+1}</div>
+      <div class="sname">${t.name}${mine?' ⭐':''}</div>
+      <div style="flex:1;display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;">
+          <div style="width:${pct}%;height:100%;border-radius:2px;background:${ovrColor(t.ovr)};"></div>
+        </div>
+      </div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:${ovrColor(t.ovr)}">${t.ovr}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderLeaders(){
+  if(!gameStarted) return;
+  const el = document.getElementById('leaders-body');
+  if(!el) return;
+
+  const skaters = [];
+  const goalies = [];
+  allTeams().forEach(team => {
+    team.roster.forEach(p => {
+      const row = { p, team: team.name, s: getStatLine(p) };
+      if(p.pos === 'G') goalies.push(row);
+      else skaters.push(row);
+    });
+  });
+
+  const mineTeam = state.myTeam.name;
+  const teamAbr = (name) => name.split(' ').map(w => w[0]).join('').slice(0, 3).toUpperCase();
+  const rowBg = (team) => team === mineTeam ? 'background:rgba(41,128,185,0.12);' : '';
+  const th = 'text-align:left;padding:6px 8px;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.7px;';
+  const td = (team) => `padding:7px 8px;border-bottom:1px solid rgba(100,160,220,0.08);font-size:13px;${rowBg(team)}`;
+
+  const skTable = (title, rows, statCells) => {
+    const head = `<tr><th style="${th}">#</th><th style="${th}">Player</th><th style="${th}">Tm</th><th style="${th}">GP</th>${statCells.headers}</tr>`;
+    const body = rows.map((r, i) => {
+      const star = r.team === mineTeam ? ' ★' : '';
+      return `<tr>
+        <td style="${td(r.team)}">${i + 1}</td>
+        <td style="${td(r.team)};font-weight:600;">${r.p.name}${star}</td>
+        <td style="${td(r.team)};color:var(--text2);">${teamAbr(r.team)}</td>
+        <td style="${td(r.team)}">${r.s.gp || 0}</td>
+        ${statCells.cells(r)}</tr>`;
+    }).join('');
+    return `<div style="margin-bottom:20px;">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${title}</div>
+      <div class="table-wrap"><table style="width:100%;border-collapse:collapse;"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    </div>`;
+  };
+
+  const byGoals = [...skaters].sort((a, b) =>
+    (b.s.g || 0) - (a.s.g || 0) || (b.s.a || 0) - (a.s.a || 0) || (a.s.gp || 0) - (b.s.gp || 0)
+  ).slice(0, 15);
+  const byAst = [...skaters].sort((a, b) =>
+    (b.s.a || 0) - (a.s.a || 0) || (b.s.g || 0) - (a.s.g || 0) || (a.s.gp || 0) - (b.s.gp || 0)
+  ).slice(0, 15);
+  const byPts = [...skaters].sort((a, b) => {
+    const pa = (a.s.g || 0) + (a.s.a || 0), pb = (b.s.g || 0) + (b.s.a || 0);
+    return pb - pa || (b.s.g || 0) - (a.s.g || 0) || (a.s.gp || 0) - (b.s.gp || 0);
+  }).slice(0, 15);
+  const byPM = [...skaters].sort((a, b) =>
+    (b.s.pm || 0) - (a.s.pm || 0) || (b.s.g || 0) - (a.s.g || 0) || (a.s.gp || 0) - (b.s.gp || 0)
+  ).slice(0, 15);
+
+  const gQualified = goalies.filter(g => (g.s.gp || 0) > 0 && (g.s.sa || 0) > 0);
+  const byGw = [...goalies].sort((a, b) =>
+    (b.s.w || 0) - (a.s.w || 0) || (a.s.ga || 0) - (b.s.ga || 0)
+  ).slice(0, 10);
+  const bySv = [...gQualified].sort((a, b) =>
+    calcSV(b.p) - calcSV(a.p) || (b.s.sa || 0) - (a.s.sa || 0)
+  ).slice(0, 10);
+  const byGaa = [...gQualified].sort((a, b) =>
+    parseFloat(calcGAA(a.p)) - parseFloat(calcGAA(b.p)) || (b.s.sa || 0) - (a.s.sa || 0)
+  ).slice(0, 10);
+
+  const gTable = (title, rows, extraHead, rowHtml) => {
+    const head = `<tr><th style="${th}">#</th><th style="${th}">Goalie</th><th style="${th}">Tm</th><th style="${th}">GP</th>${extraHead}</tr>`;
+    const body = rows.map((r, i) => rowHtml(r, i)).join('');
+    return `<div style="margin-bottom:20px;">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">${title}</div>
+      <div class="table-wrap"><table style="width:100%;border-collapse:collapse;"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    </div>`;
+  };
+
+  let html = `<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Regular season player stats league-wide (updates when you sim weeks).</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px 20px;">`;
+
+  html += skTable('Goals', byGoals, {
+    headers: `<th style="${th}">G</th>`,
+    cells: (r) => `<td style="${td(r.team)};font-family:'Barlow Condensed',sans-serif;font-weight:700;">${r.s.g || 0}</td>`
+  });
+  html += skTable('Assists', byAst, {
+    headers: `<th style="${th}">A</th>`,
+    cells: (r) => `<td style="${td(r.team)};font-family:'Barlow Condensed',sans-serif;font-weight:700;">${r.s.a || 0}</td>`
+  });
+  html += skTable('Points', byPts, {
+    headers: `<th style="${th}">PTS</th>`,
+    cells: (r) => `<td style="${td(r.team)};font-family:'Barlow Condensed',sans-serif;font-weight:700;">${(r.s.g || 0) + (r.s.a || 0)}</td>`
+  });
+  html += skTable('Plus / Minus', byPM, {
+    headers: `<th style="${th}">+/-</th>`,
+    cells: (r) => `<td style="${td(r.team)};font-family:'Barlow Condensed',sans-serif;font-weight:700;color:${(r.s.pm || 0) > 0 ? '#2ecc71' : (r.s.pm || 0) < 0 ? 'var(--red2)' : 'var(--text)'};">${r.s.pm > 0 ? '+' : ''}${r.s.pm || 0}</td>`
+  });
+
+  html += `</div>`;
+
+  html += gTable('Goalie — Wins', byGw,
+    `<th style="${th}">W</th><th style="${th}">L</th><th style="${th}">GA</th>`,
+    (r, i) => {
+      const star = r.team === mineTeam ? ' ★' : '';
+      return `<tr>
+        <td style="${td(r.team)}">${i + 1}</td>
+        <td style="${td(r.team)};font-weight:600;">${r.p.name}${star}</td>
+        <td style="${td(r.team)};color:var(--text2);">${teamAbr(r.team)}</td>
+        <td style="${td(r.team)}">${r.s.gp || 0}</td>
+        <td style="${td(r.team)};font-weight:700;">${r.s.w || 0}</td>
+        <td style="${td(r.team)}">${r.s.l || 0}</td>
+        <td style="${td(r.team)}">${r.s.ga || 0}</td></tr>`;
+    }
+  );
+
+  html += gTable('Goalie — Save % (min. 1 GP)', bySv,
+    `<th style="${th}">SV%</th><th style="${th}">SA</th>`,
+    (r, i) => {
+      const star = r.team === mineTeam ? ' ★' : '';
+      const pct = r.s.sa > 0 ? ((r.s.saves / r.s.sa) * 100).toFixed(2) : '—';
+      return `<tr>
+        <td style="${td(r.team)}">${i + 1}</td>
+        <td style="${td(r.team)};font-weight:600;">${r.p.name}${star}</td>
+        <td style="${td(r.team)};color:var(--text2);">${teamAbr(r.team)}</td>
+        <td style="${td(r.team)}">${r.s.gp || 0}</td>
+        <td style="${td(r.team)};font-weight:700;">${pct}</td>
+        <td style="${td(r.team)}">${r.s.sa || 0}</td></tr>`;
+    }
+  );
+
+  html += gTable('Goalie — GAA (min. 1 GP)', byGaa,
+    `<th style="${th}">GAA</th><th style="${th}">SV%</th>`,
+    (r, i) => {
+      const star = r.team === mineTeam ? ' ★' : '';
+      const sv = r.s.sa > 0 ? ((r.s.saves / r.s.sa) * 100).toFixed(2) : '—';
+      return `<tr>
+        <td style="${td(r.team)}">${i + 1}</td>
+        <td style="${td(r.team)};font-weight:600;">${r.p.name}${star}</td>
+        <td style="${td(r.team)};color:var(--text2);">${teamAbr(r.team)}</td>
+        <td style="${td(r.team)}">${r.s.gp || 0}</td>
+        <td style="${td(r.team)};font-weight:700;">${calcGAA(r.p)}</td>
+        <td style="${td(r.team)}">${sv}</td></tr>`;
+    }
+  );
+
+  el.innerHTML = html;
+}
+
+function renderLog(){
+  if(!state || !state.myTeam || !gameStarted) return;
+  const el = document.getElementById('game-log');
+  if(!state.log.length){ el.innerHTML = '<div style="color:var(--text2);font-size:13px;">No games simulated yet.</div>'; return; }
+  el.innerHTML = [...state.log].reverse().map(e => `<div class="log-line">${e}</div>`).join('');
+}
+
+// Trade state: arrays of selected player IDs and pick rounds
+let trade = { myPlayers:[], myPicks:[], theirPlayers:[], theirPicks:[], team:null };
+
+// ----------------------------------------------------------------
+// PICK INVENTORY SYSTEM
+// Each pick: { id, originalTeam, ownerTeam, round, season }
+// ----------------------------------------------------------------
+function generateTeamPicks(teamName, currentSeason){
+  const picks = [];
+  // Each team owns their own picks for current season + next 2 years
+  for(let yr = 0; yr <= 2; yr++){
+    for(let r = 1; r <= 7; r++){
+      picks.push({
+        id: `${teamName}-${currentSeason+yr}-R${r}`,
+        originalTeam: teamName,
+        ownerTeam: teamName,
+        round: r,
+        season: currentSeason + yr,
+      });
+    }
+  }
+  return picks;
+}
+
+function initPickInventory(){
+  if(!state.pickInventory) state.pickInventory = [];
+  // Add picks for any team that doesn't have them yet
+  const season = state.season || 1;
+  allTeams().forEach(team => {
+    // Check if this team already has picks generated
+    const hasCurrentPicks = state.pickInventory.some(p => p.ownerTeam===team.name || p.originalTeam===team.name);
+    if(!hasCurrentPicks){
+      generateTeamPicks(team.name, season).forEach(p => state.pickInventory.push(p));
+    }
+  });
+}
