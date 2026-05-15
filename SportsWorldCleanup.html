@@ -898,3 +898,303 @@ function showTeamSelect() {
         <button onclick="setExtendClause('NMC')" id="extend-clause-NMC" class="btn btn-sm">🔴 NMC</button>
         <button onclick="setExtendClause('M-NMC')" id="extend-clause-M-NMC" class="btn btn-sm">🟡 M-NMC</button>
         <button onclick="setExtendClause('NTC')" id="extend-clause-NTC" class="btn btn-sm">🔵 NTC</button>
+    </div>
+      <div id="extend-clause-desc" style="font-size:11px;color:var(--text2);margin-top:5px;"></div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+      <span style="color:var(--text2);">Cap space after extension</span>
+      <span id="extend-cap-left" style="font-weight:600;"></span>
+    </div>
+    <div id="extend-reaction" style="font-size:13px;min-height:22px;font-weight:600;text-align:center;padding:6px;border-radius:4px;"></div>
+    <div id="extend-warn" class="warn-text" style="text-align:center;margin-top:4px;"></div>
+
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('modal-extend')">Cancel</button>
+      <button class="btn btn-primary" style="background:var(--accent);border-color:var(--accent);" onclick="confirmExtend()">Offer Extension</button>
+    </div>
+  </div>
+</div>
+
+<!-- RELEASE MODAL -->
+<div class="modal-overlay" id="modal-release">
+  <div class="modal">
+    <h2>Release Player</h2>
+    <div id="release-info" style="font-size:14px;margin-bottom:8px;"></div>
+    <p style="font-size:13px;color:var(--text2);">Releasing this player clears their cap space. They will enter free agency.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-release')">Cancel</button>
+      <button class="btn btn-red" onclick="confirmRelease()">Release</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAUSE MENU MODAL -->
+<div class="modal-overlay" id="modal-pause">
+  <div class="modal">
+    <h2>Game Paused</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">What would you like to do?</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-pause')">Resume Game</button>
+      <button class="btn" onclick="quitToMainMenu()">Quit to Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM ROSTER (scouting from Power Rankings, etc.) -->
+<div class="modal-overlay" id="modal-team-roster">
+  <div class="modal" style="width:720px;max-width:96vw;max-height:90vh;overflow-y:auto;">
+    <h2 id="modal-team-roster-title">Team Roster</h2>
+    <p id="modal-team-roster-sub" style="font-size:13px;color:var(--text2);margin-bottom:12px;"></p>
+    <div id="modal-team-roster-body"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('modal-team-roster')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYER PAGE -->
+<div id="player-page" style="display:none;position:fixed;inset:0;background:var(--rink);z-index:200;overflow-y:auto;">
+  <div style="max-width:700px;margin:0 auto;padding:24px 16px 60px;">
+    <button onclick="closePlayerPage()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;margin-bottom:20px;">← Back to Roster</button>
+    <div id="player-page-content"></div>
+  </div>
+</div>
+
+<!-- FLASH -->
+<div class="flash" id="flash">
+  <div class="flash-title" id="flash-title"></div>
+  <div id="flash-body" style="font-size:13px;color:var(--text2);margin-top:2px;"></div>
+</div>
+
+function showTeamSelect() {
+  // Hide the main menu
+  const menu = document.getElementById('screen-menu');
+  if (menu) menu.classList.remove('active');
+  
+  // Show the team selection screen
+  const teamSel = document.getElementById('screen-teamsel');
+  if (teamSel) teamSel.classList.add('active');
+  
+  // Build the grid of teams
+  if (typeof renderTeamSelectGrid === "function") {
+    renderTeamSelectGrid(); 
+  }
+}
+
+// ---- League & Contract System ----
+const league = {
+  salaryCap: 104,          // total cap ceiling in $M
+  capFloorPct: 75,         // floor = 75% of cap (teams must spend at least this %)
+  minSalary: 0.775,        // league minimum per player in $M
+  starterSharePct: 65,     // % of games started by the #1 goalie (default 65 = ~53 of 82)
+  get cap(){ return this.salaryCap; },
+  get capFloor(){ return Math.round(this.salaryCap * this.capFloorPct / 100 * 100) / 100; }, // floor in $M
+  get capFloorPct_(){ return this.capFloorPct; }
+};
+
+// Season phases in order
+var PHASES = {
+  PRESEASON:      'Preseason',
+  REGULAR_SEASON: 'Regular Season',
+  TRADE_DEADLINE: 'Trade Deadline',
+  PLAYOFFS:       'Playoffs',
+  DRAFT:          'Draft',
+  RESIGN:         'Re-Signing',
+  FREE_AGENCY:    'Free Agency',
+  OFFSEASON:      'Offseason',
+};
+const SEASON_MONTHS = [
+  { name:'October',   days:31 },
+  { name:'November',  days:30 },
+  { name:'December',  days:31 },
+  { name:'January',   days:31 },
+  { name:'February',  days:28 },
+  { name:'March',     days:31 },
+  { name:'April',     days:30 },
+];
+// Game days per week: Tue=2, Thu=4, Sat=6 (0=Sun)
+const GAME_DAYS = [2, 4, 6];
+const TRADE_DEADLINE = { month:'February', day:28 };
+
+const POTENTIAL_TIERS = {
+  F: [
+    { role:'Franchise Forward',  ovrRange:[93,99], weight:1   }, // ~1-2 per league
+    { role:'Elite Forward',      ovrRange:[88,92], weight:4   }, // ~8-12 league-wide
+    { role:'Top 6 Forward',      ovrRange:[83,87], weight:14  }, // solid contributors
+    { role:'Top 9 Forward',      ovrRange:[78,82], weight:28  }, // most common good player
+    { role:'Bottom 6 Forward',   ovrRange:[73,78], weight:32  }, // depth/role players
+    { role:'Depth Forward',      ovrRange:[65,73], weight:21  }, // AHL/fringe
+  ],
+  D: [
+    { role:'Franchise Defenseman',   ovrRange:[93,99], weight:1   },
+    { role:'Elite Defenseman',       ovrRange:[88,92], weight:4   },
+    { role:'Top Pair Defenseman',    ovrRange:[83,87], weight:14  },
+    { role:'Top 4 Defenseman',       ovrRange:[78,82], weight:28  },
+    { role:'Bottom Pair Defenseman', ovrRange:[73,78], weight:32  },
+    { role:'Depth Defenseman',       ovrRange:[65,73], weight:21  },
+  ],
+  G: [
+    // Goalies are rare — most teams have 1 true starter, backup is notably weaker
+    { role:'Franchise Goalie', ovrRange:[93,99], weight:1   }, // generational rarity
+    { role:'Elite Goalie',     ovrRange:[87,92], weight:3   }, // ~5-8 league-wide
+    { role:'Starting Goalie',  ovrRange:[80,86], weight:18  }, // 1 per team typical
+    { role:'Backup Goalie',    ovrRange:[72,79], weight:40  }, // clearly weaker
+    { role:'Depth Goalie',     ovrRange:[62,72], weight:38  }, // AHL/emergency
+  ],
+};
+// Tier color coding — franchise/elite stand out, depth is muted
+const TIER_COLORS = {
+  'Franchise Forward':      '#5dade2',
+  'Franchise Defenseman':   '#5dade2',
+  'Franchise Goalie':       '#5dade2',
+  'Elite Forward':          '#2ecc71',
+  'Elite Defenseman':       '#2ecc71',
+  'Elite Goalie':           '#2ecc71',
+  'Top 6 Forward':          '#aed6f1',
+  'Top Pair Defenseman':    '#aed6f1',
+  'Starting Goalie':        '#aed6f1',
+  'Top 9 Forward':          '#d5dbdb',
+  'Top 4 Defenseman':       '#d5dbdb',
+  'Backup Goalie':          '#d5dbdb',
+  'Bottom 6 Forward':       '#7f8c8d',
+  'Bottom Pair Defenseman': '#7f8c8d',
+  'Depth Goalie':           '#7f8c8d',
+  'Depth Forward':          '#566573',
+  'Depth Defenseman':       '#566573',
+};
+const TAB_GROUP = {
+  roster:'team', lines:'team', affiliates:'team', contracts:'team', log:'team',
+  standings:'league', playoffs:'league', power:'league', calendar:'league', leaders:'league',
+  fa:'transactions', trade:'transactions', resign:'transactions', draft:'transactions',
+};
+class Contract {
+  constructor(capPct, years){
+    this.capPct = capPct;       // percentage of salary cap e.g. 8.5
+    this.years = years;
+    this.yearsRemaining = years;
+  }
+  get salary(){ return Math.round(league.salaryCap * this.capPct / 100 * 100) / 100; }
+  get totalValue(){ return Math.round(this.salary * this.years * 100) / 100; }
+}
+
+// Helper: convert $M salary to cap %
+function salaryToCapPct(salM){ return Math.round(salM / league.salaryCap * 1000) / 10; }
+// Helper: convert cap % to $M salary
+function capPctToSalary(pct){ return Math.round(league.salaryCap * pct / 100 * 100) / 100; }
+
+const BUDGET = league.salaryCap; // keep compatibility
+
+// ---- Entry Level Contract (ELC) System ----
+const ELC = {
+  maxSalary: 0.925,   // $925K cap hit max
+  maxYears: 3,        // max 3 years
+  maxAge: 21,         // players 18-21 qualify for ELC
+};
+
+// Check if a player is currently on an ELC
+function isELC(p){ return !!p.isELC; }
+
+// Check if a player is ELC-eligible (just drafted, age 18-21)
+function isELCEligible(p){ return p.isDraftee && p.age <= ELC.maxAge; }
+const MAX_WEEKS = 82;
+const POSITIONS = ['C','LW','RW','LD','RD','G'];
+const FIRSTS = [
+  'Adler','Alaric','Anders','Ansel','Arden','Arlo','Atlas','August','Axel','Barrett',
+  'Beckett','Benedict','Boden','Boone','Bowen','Bram','Brecken','Brooks','Callum','Caspian',
+  'Cato','Cedric','Colter','Conrad','Cormac','Dashiell','Declan','Dexton','Dorian','Eamon',
+  'Elias','Emmett','Enzo','Ewan','Ezra','Felix','Finnian','Fletcher','Flynn','Gage',
+  'Gideon','Griffin','Gunnar','Harlan','Hayes','Hendrix','Hugo','Huxley','Ibsen','Ignatius',
+  'Iver','Jasper','Jethro','Jude','Kael','Kellan','Kiefer','Killian','Knox','Lachlan',
+  'Lars','Leif','Lenz','Lexton','Linus','Lowell','Lucian','Magnus','Marek','Marius',
+  'Milo','Nico','Nils','Nolan','Orion','Oscar','Otto','Otis','Pascal','Pavel',
+  'Quentin','Quill','Rafferty','Rafe','Reid','Remy','Rhys','Ridge','Ronan','Roscoe',
+  'Rowan','Ryker','Silas','Soren','Stellan','Sven','Thatcher','Thayer','Torsten','Tristan',
+  'Urban','Vance','Vaughn','Victor','Viggo','Wilder','Willem','Xander','Zane','Zephyr'
+];
+
+const LASTS = [
+  'Aaby','Ames','Bakke','Barlow','Beck','Berg','Blackwood','Blythe','Borg','Bourne',
+  'Brooks','Calder','Carne','Channing','Corbin','Craggs','Cross','Crowe','Dahl','Dixon',
+  'Drake','Eklund','Ellery','Falk','Fane','Finch','Flint','Foster','Gale','Garrick',
+  'Gentry','Glass','Grier','Grimes','Hale','Hall','Hart','Hawthorne','Hayes','Holm',
+  'Holt','Hurst','Ivers','Jace','Jarvis','Jorgenson','Kane','Keating','Kemp','Kingsley',
+  'Knott','Laine','Lantz','Larkin','Lenz','Lind','Loke','Lund','Main','Marek',
+  'Marsh','Merrit','Miller','Morgans','Morrow','Nash','Niles','Nord','Nyberg','Oakes',
+  'Oland','Pace','Park','Pike','Quinn','Raine','Raske','Reed','Reeve','Ridge',
+  'Rivers','Rixon','Roark','Roux','Ryder','Savage','Skagen','Slade','Sloan','Sorenson',
+  'Steel','Sterling','Stone','Strand','Taggart','Talbot','Thorne','Tierney','Tuma','Vance',
+  'Vane','Vester','Voda','Wade','Ward','West','Wick','Wolfe','Worth','Zale'
+];
+
+// ADD THESE TWO LINES HERE:
+let playerPageId = null;
+let playerPageTab = 'overview';
+
+// NHL-style league structure
+const DIVISIONS = {
+  'Atlantic':   ['Ironwood Wolves','Lakeshore Falcons','Northgate Lynx','Riverbend Sharks','Coastal Fury','Midtown Thunder','Highland Bears','Bayview Cranes'],
+  'Metropolitan':['Pinewood Predators','Coldwater Kings','Duskfall Ravens','Harborview Seals','Ironclad Stallions','Ember Ridge Foxes','Stonewall Griffins','Summit City Eagles'],
+  'Central':    ['Frostpeak Yetis','Crestline Cougars','Delta Storm','Ashford Knights','Tundra Bay Orcas','Redrock Outlaws','Clearwater Herons','Westgate Titans'],
+  'Pacific':    ['Glacier Run Moose','Prairie Wind Mustangs','Copperhead Rattlers','Thornfield Lions','Silver Lake Lynx','Blackstone Phantoms','Maple Run Lumberjacks','Crescent Bay Marlins']
+};
+const CONFERENCES = { 'Eastern': ['Atlantic','Metropolitan'], 'Western': ['Central','Pacific'] };
+const TEAM_NAMES = Object.values(DIVISIONS).flat();
+
+let signTarget = null, releaseTarget = null;
+let signClause = null;
+let extendClause = null;
+
+const CLAUSE_DESCS = {
+  NMC:   { label:'No-Movement Clause', desc:'Player cannot be traded or sent to minors.', color:'var(--red2)' },
+  'M-NMC':{ label:'Modified NMC', desc:'NMC for first half of contract, then converts to NTC.', color:'var(--gold)' },
+  NTC:   { label:'No-Trade Clause', desc:'Player submits a list of 10 teams they cannot be traded to.', color:'#5dade2' },
+};
+
+function setSignClause(clause){
+  signClause = clause;
+  ['none','NMC','M-NMC','NTC'].forEach(c=>{
+    const btn = document.getElementById('sign-clause-'+(c==='none'?'none':c));
+    if(btn) btn.style.borderColor = ((clause===null&&c==='none')||clause===c) ? 'var(--accent)' : 'var(--border)';
+    if(btn) btn.style.color = ((clause===null&&c==='none')||clause===c) ? 'var(--ice)' : 'var(--text2)';
+  });
+  const desc = document.getElementById('sign-clause-desc');
+  if(desc) desc.innerHTML = clause ? `<span style="color:${CLAUSE_DESCS[clause].color};">${CLAUSE_DESCS[clause].label}:</span> ${CLAUSE_DESCS[clause].desc}` : '';
+}
+
+function setExtendClause(clause){
+  extendClause = clause;
+  ['none','NMC','M-NMC','NTC'].forEach(c=>{
+    const btn = document.getElementById('extend-clause-'+(c==='none'?'none':c));
+    if(btn) btn.style.borderColor = ((clause===null&&c==='none')||clause===c) ? 'var(--accent)' : 'var(--border)';
+    if(btn) btn.style.color = ((clause===null&&c==='none')||clause===c) ? 'var(--ice)' : 'var(--text2)';
+  });
+  const desc = document.getElementById('extend-clause-desc');
+  if(desc) desc.innerHTML = clause ? `<span style="color:${CLAUSE_DESCS[clause].color};">${CLAUSE_DESCS[clause].label}:</span> ${CLAUSE_DESCS[clause].desc}` : '';
+}
+let rosterSort = { key:'pos', dir:1 };
+let faSort = { key:'ovr', dir:-1 };
+let draftSort = { key:'ovr', dir:-1 };
+
+let flashTimer = null;
+
+function rnd(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function pname(){ return pick(FIRSTS)+' '+pick(LASTS); }
+function salFromOVR(ovr){
+  // Returns salary in $M derived from cap percentage ranges per OVR
+  if(ovr < 80) return league.minSalary;
+  // Cap % ranges per OVR — [min%, max%]
+  const PCT_TABLE = {
+    80:[1.0,1.5], 81:[1.5,1.8],
+    82:[1.8,2.2], 83:[2.4,3.0],
+    84:[3.5,4.5], 85:[4.8,5.5],
+    86:[5.8,6.5], 87:[6.8,7.8],
+    88:[8.0,9.0], 89:[9.2,10.2],
+    90:[10.5,11.2], 91:[11.3,12.0],
+    92:[12.1,12.8], 93:[12.9,13.3],
+    94:[13.3,13.7], 95:[13.7,14.0],
+    96:[14.0,14.2], 97:[14.2,14.35],
+    98:[14.35,14.5], 99:[14.5,14.6],
+  };
+  const cap = ovr >= 99 ? 99 : ovr;
