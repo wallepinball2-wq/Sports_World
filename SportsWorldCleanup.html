@@ -2843,13 +2843,6 @@ function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
 }
 
 function assignPlusMinus(team, goalsFor, goalsAgainst){
-  const skaters = [...team.roster].filter(p=>p.pos!=='G')
-    .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
-  skaters.forEach(p=>{
-    getStatLine(p).pm += (goalsFor - goalsAgainst);
-  });
-}
-function assignPlusMinus(team, goalsFor, goalsAgainst){
   // Top 6 forwards and top 4 D roughly track +/-
   const skaters = [...team.roster].filter(p=>p.pos!=='G')
     .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
