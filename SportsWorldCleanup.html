@@ -1198,3 +1198,603 @@ function salFromOVR(ovr){
     98:[14.35,14.5], 99:[14.5,14.6],
   };
   const cap = ovr >= 99 ? 99 : ovr;
+ const [lo, hi] = PCT_TABLE[cap] || PCT_TABLE[99];
+  // Random value within range, rounded to 2dp
+  const pct = Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
+  return capPctToSalary(pct);
+}
+
+function capPctFromOVR(ovr){
+  return salaryToCapPct(salFromOVR(ovr));
+}
+function contractYears(ovr, age){
+  // Stars in prime get long deals, old/bad players get short deals
+  if(age >= 35) return 1;
+  if(age >= 33) return rnd(1,2);
+  if(ovr >= 88) return rnd(6,8);
+  if(ovr >= 82) return rnd(4,7);
+  if(ovr >= 75) return rnd(2,5);
+  if(ovr >= 68) return rnd(1,3);
+  return rnd(1,2);
+}
+
+let state;
+
+// ---- Attribute System ----
+
+// Skater archetypes: name, weights for [shooting, passing, skating, defense, hockeyIQ]
+// ----------------------------------------------------------------
+// UNIFIED SKATER ATTRIBUTE SYSTEM
+// All skaters share 21 attributes across 4 groups.
+// Archetypes define deviations from base OVR per attribute.
+// Positive = above OVR, negative = below OVR (in points).
+// ----------------------------------------------------------------
+const SKATER_ATTR_KEYS = [
+  // Skating (5)
+  'speed','acceleration','agility','balance','endurance',
+  // Offensive (6)
+  'shootingAccuracy','shotPower','passing','puckHandling','offensiveIQ','vision',
+  // Defensive (6)
+  'defensiveIQ','positioning','stickChecking','shotBlocking','faceoffs','poise',
+  // Physical (4)
+  'strength','checking','aggression','discipline',
+];
+
+// Archetypes: deviations per attribute from base OVR
+// Unlisted attributes = 0 deviation (stays at base OVR)
+const SKATER_ARCHETYPES = {
+  Sniper: {
+    shootingAccuracy:+14, shotPower:+12, speed:+6, offensiveIQ:+5,
+    defensiveIQ:-12, stickChecking:-8, shotBlocking:-10, puckHandling:+4,
+  },
+  Playmaker: {
+    passing:+14, vision:+12, offensiveIQ:+10, puckHandling:+8,
+    shootingAccuracy:-8, shotPower:-10, strength:-4,
+  },
+  'Two-Way Forward': {
+    offensiveIQ:+4, defensiveIQ:+4, passing:+3, shootingAccuracy:+2,
+    // balanced — small boosts across the board
+  },
+  'Power Forward': {
+    shotPower:+10, strength:+10, checking:+8, aggression:+8,
+    agility:-6, acceleration:-4, puckHandling:-4,
+  },
+  'Defensive Forward': {
+    defensiveIQ:+12, stickChecking:+10, shotBlocking:+8, faceoffs:+8, poise:+6,
+    shootingAccuracy:-10, shotPower:-8, vision:-4,
+  },
+ Grinder: {
+    // Physical/Defensive Boosts (The "Grind")
+    endurance:+10, strength:+12, checking:+15, faceoffs:+8, aggression:+20, 
+    
+    // Offensive Penalties (The "Worst")
+    shootingAccuracy:-20, // Huge penalty to scoring
+    shotPower:-15,        // Their shots will be very weak
+    vision:-18,           // They will almost never get assists
+    puckHandling:-15,     // They will lose the puck easily if they try to dangle
+    offensiveIQ:-15,       // They will rarely be in the right spot to score
+  },
+  Enforcer: {
+    strength:+16, checking:+14, aggression:+14,
+    shootingAccuracy:-14, vision:-10, passing:-8, agility:-6,
+  },
+  'Offensive D': {
+    passing:+12, vision:+10, offensiveIQ:+10, speed:+6, puckHandling:+6,
+    shotBlocking:-8, strength:-4, checking:-4,
+  },
+  'Shutdown D': {
+    defensiveIQ:+14, positioning:+12, strength:+10, shotBlocking:+8, stickChecking:+8,
+    shootingAccuracy:-12, offensiveIQ:-8, puckHandling:-6,
+  },
+  'Two-Way D': {
+    defensiveIQ:+6, positioning:+6, passing:+4, offensiveIQ:+4,
+    // balanced D — moderate across the board
+  },
+};
+
+// Position → available archetypes
+const POS_ARCHETYPES = {
+  C:  ['Sniper','Playmaker','Two-Way Forward','Power Forward','Defensive Forward','Grinder'],
+  LW: ['Sniper','Playmaker','Two-Way Forward','Power Forward','Defensive Forward','Grinder','Enforcer'],
+  RW: ['Sniper','Playmaker','Two-Way Forward','Power Forward','Defensive Forward','Grinder','Enforcer'],
+  LD: ['Offensive D','Shutdown D','Two-Way D'],
+  RD: ['Offensive D','Shutdown D','Two-Way D'],
+};
+
+// Position-specific OVR weight per attribute group
+// Weights must sum to 1.0 per position
+const OVR_WEIGHTS = {
+  C:  { speed:0.06, acceleration:0.04, agility:0.04, balance:0.03, endurance:0.03,
+        shootingAccuracy:0.07, shotPower:0.06, passing:0.07, puckHandling:0.05, offensiveIQ:0.07, vision:0.06,
+        defensiveIQ:0.06, positioning:0.04, stickChecking:0.04, shotBlocking:0.02, faceoffs:0.06, poise:0.04,
+        strength:0.03, checking:0.03, aggression:0.02, discipline:0.04 },
+  LW: { speed:0.07, acceleration:0.05, agility:0.05, balance:0.03, endurance:0.03,
+        shootingAccuracy:0.09, shotPower:0.08, passing:0.06, puckHandling:0.06, offensiveIQ:0.07, vision:0.05,
+        defensiveIQ:0.05, positioning:0.03, stickChecking:0.04, shotBlocking:0.02, faceoffs:0.02, poise:0.03,
+        strength:0.04, checking:0.04, aggression:0.03, discipline:0.03 },
+  RW: { speed:0.07, acceleration:0.05, agility:0.05, balance:0.03, endurance:0.03,
+        shootingAccuracy:0.09, shotPower:0.08, passing:0.06, puckHandling:0.06, offensiveIQ:0.07, vision:0.05,
+        defensiveIQ:0.05, positioning:0.03, stickChecking:0.04, shotBlocking:0.02, faceoffs:0.02, poise:0.03,
+        strength:0.04, checking:0.04, aggression:0.03, discipline:0.03 },
+  LD: { speed:0.05, acceleration:0.04, agility:0.04, balance:0.04, endurance:0.04,
+        shootingAccuracy:0.03, shotPower:0.04, passing:0.07, puckHandling:0.04, offensiveIQ:0.05, vision:0.05,
+        defensiveIQ:0.09, positioning:0.08, stickChecking:0.06, shotBlocking:0.06, faceoffs:0.03, poise:0.06,
+        strength:0.06, checking:0.05, aggression:0.03, discipline:0.04 },
+  RD: { speed:0.05, acceleration:0.04, agility:0.04, balance:0.04, endurance:0.04,
+        shootingAccuracy:0.03, shotPower:0.04, passing:0.07, puckHandling:0.04, offensiveIQ:0.05, vision:0.05,
+        defensiveIQ:0.09, positioning:0.08, stickChecking:0.06, shotBlocking:0.06, faceoffs:0.03, poise:0.06,
+        strength:0.06, checking:0.05, aggression:0.03, discipline:0.04 },
+};
+
+// ----------------------------------------------------------------
+// UNIFIED GOALIE ATTRIBUTE SYSTEM — 17 attributes across 4 groups
+// ----------------------------------------------------------------
+const GOALIE_ATTR_KEYS = [
+  // Athleticism (4)
+  'reflexes','agility','recovery','endurance',
+  // Technical (6)
+  'positioning','angles','reboundControl','glove','stick','puckTracking',
+  // Mental (4)
+  'poise','anticipation','consistency','pressureHandling',
+  // Physical (3)
+  'strength','aggression','durability',
+];
+
+// Archetypes: deviations per attribute from base OVR
+const GOALIE_ARCHETYPES = {
+  'Butterfly': {
+    positioning:+14, angles:+12, reboundControl:+10, poise:+6,
+    reflexes:-4, agility:-8, recovery:-6,
+  },
+  'Athletic': {
+    reflexes:+14, agility:+12, recovery:+10, strength:+6,
+    positioning:-6, reboundControl:-8, poise:-4,
+  },
+  'Hybrid': {
+    positioning:+6, reflexes:+6, poise:+4, angles:+4,
+    // balanced — small boosts across the board
+  },
+  'Puck-Handler': {
+    stick:+16, puckTracking:+12, agility:+6, anticipation:+6,
+    reboundControl:-6, strength:-4,
+  },
+  'Scrambler': {
+    reflexes:+12, recovery:+12, aggression:+8, durability:+6,
+    positioning:-10, angles:-8, consistency:-8,
+  },
+};
+
+// OVR weights for goalies
+const GOALIE_OVR_WEIGHTS = {
+  reflexes:0.10, agility:0.06, recovery:0.06, endurance:0.04,
+  positioning:0.12, angles:0.10, reboundControl:0.08, glove:0.07, stick:0.05, puckTracking:0.06,
+  poise:0.07, anticipation:0.06, consistency:0.07, pressureHandling:0.06,
+  strength:0.03, aggression:0.02, durability:0.05,
+};
+
+// Pick archetype based on position
+function pickArchetype(pos){
+  if(pos === 'G') return pick(Object.keys(GOALIE_ARCHETYPES));
+  const options = POS_ARCHETYPES[pos] || ['Two-Way Forward'];
+  return pick(options);
+}
+
+// Generate attributes from a target OVR and archetype weights
+function genAttributes(pos, targetOVR, archetype){
+  // Attribute generation: archetype creates asymmetry, not inflation.
+  // A sniper's shooting might be 10pts above OVR but defense 10 below — avg stays near OVR.
+  if(pos === 'G'){
+    const deviations = GOALIE_ARCHETYPES[archetype] || {};
+    const attrs = {};
+    GOALIE_ATTR_KEYS.forEach(k => {
+      const dev = deviations[k] || 0;
+      const base = targetOVR + dev + rnd(-4, 4);
+      attrs[k] = Math.min(99, Math.max(40, Math.round(base)));
+    });
+    return attrs;
+  } else {
+    const deviations = SKATER_ARCHETYPES[archetype] || {};
+    const attrs = {};
+    SKATER_ATTR_KEYS.forEach(k => {
+      const dev = deviations[k] || 0;
+      const base = targetOVR + dev + rnd(-4, 4);
+      attrs[k] = Math.min(99, Math.max(40, Math.round(base)));
+    });
+    return attrs;
+  }
+}
+
+// Calculate OVR from attributes (keeps p.ovr consistent)
+function calcOVR(attrs, pos){
+  if(!attrs) return 80;
+  if(pos === 'G'){
+    let total = 0;
+    GOALIE_ATTR_KEYS.forEach(k => {
+      total += (attrs[k] || 70) * (GOALIE_OVR_WEIGHTS[k] || 0);
+    });
+    return Math.min(99, Math.max(40, Math.round(total)));
+  } else {
+    const weights = OVR_WEIGHTS[pos] || OVR_WEIGHTS['C'];
+    let total = 0;
+    SKATER_ATTR_KEYS.forEach(k => {
+      total += (attrs[k] || 70) * (weights[k] || 0);
+    });
+    return Math.min(99, Math.max(40, Math.round(total)));
+  }
+}
+
+// Attribute label colors
+function attrColor(val){
+  if(val >= 90) return '#5dade2';
+  if(val >= 80) return '#2ecc71';
+  if(val >= 70) return 'var(--ice)';
+  return 'var(--red2)';
+}
+
+function newPlayer(pos, ovr, age){
+  const targetOvr = ovr;
+  // Step 1: determine target OVR — realistic distribution
+  if(!ovr){
+    pos = pos || pick(POSITIONS);
+    if(pos === 'G'){
+      const roll = rnd(1,100);
+      if(roll <= 1)       ovr = rnd(91,94);   // generational — extremely rare
+      else if(roll <= 5) ovr = rnd(86,90);   // strong starter — capped by league logic in newGoalie for rosters
+      else if(roll <= 38) ovr = rnd(82,86);  // NHL starter band
+      else if(roll <= 72) ovr = rnd(78,82);  // backup / platoon
+      else                ovr = rnd(70,78); // depth
+    } else {
+      const roll = rnd(1,100);
+      if(roll <= 35)      ovr = rnd(73,77);  // depth/bottom-6 (35%)
+      else if(roll <= 65) ovr = rnd(77,82);  // middle tier (30%)
+      else if(roll <= 82) ovr = rnd(82,86);  // solid starters (17%)
+      else if(roll <= 93) ovr = rnd(86,90);  // stars (11%)
+      else if(roll <= 98) ovr = rnd(90,93);  // elite (5%)
+      else                ovr = rnd(93,97);  // franchise (2%)
+    }
+  } else {
+    pos = pos || pick(POSITIONS);
+  }
+  age = age || rnd(19,35);
+
+  // Step 2: pick archetype and generate attributes from target OVR
+  const archetype = pickArchetype(pos);
+  const attrs = genAttributes(pos, ovr, archetype);
+
+  // Step 3: derive OVR from attributes (single source of truth)
+  ovr = calcOVR(attrs, pos);
+  // Clamp all positions to ±3 of target — prevents attribute variance
+  // from producing wildly off-target overalls (e.g. 3x 95-OVR defensemen)
+  if(typeof targetOvr === 'number'){
+    ovr = Math.min(Math.min(99, targetOvr + 3), Math.max(Math.max(40, targetOvr - 3), ovr));
+  }
+
+  const sal = Math.max(0.5, salFromOVR(ovr));
+  const finalSal = Math.max(league.minSalary, sal);
+  const finalPct = salaryToCapPct(finalSal);
+  return {
+    id: Math.random().toString(36).slice(2,9),
+    name: pname(), pos, ovr, age,
+    salary: finalSal, capPct: finalPct,
+    years: contractYears(ovr, age),
+    archetype, attrs,
+    stats: freshStats(pos),
+    seasonHistory: [],
+    careerTotals: freshCareerTotals(pos)
+  };
+}
+
+function newGoalie(role){
+  const roll = rnd(1,100);
+  let target;
+  if(role === 'starter'){
+    // Hard league-wide scarcity: very few 90+ and 88+ masks after attribute roll
+    if(leagueGoalies90PlusCount < 2 && roll <= 1){
+      target = rnd(91, 94);
+    } else if(leagueGoalies90PlusCount < 2 && roll <= 3){
+      target = rnd(88, 90);
+    } else if(leagueGoalies88PlusCount < 8 && roll <= 14){
+      target = rnd(85, 88);
+    } else if(roll <= 52){
+      target = rnd(81, 85);
+    } else {
+           target = rnd(76, 81);
+    }
+  } else if(role === 'backup'){
+    if(roll <= 8) target = rnd(78, 81);
+    else if(roll <= 38) target = rnd(75, 78);
+    else target = rnd(71, 75);
+  } else {
+    target = rnd(66, 74);
+  }
+  const p = newPlayer('G', target);
+  if(p.ovr >= 90) leagueGoalies90PlusCount++;
+  if(p.ovr >= 88) leagueGoalies88PlusCount++;
+  return p;
+}
+
+function newTeam(name) {
+  const roster = [];
+  // 1. Get team identity from TEAM_DATA (default to Balanced if not found)
+  const info = TEAM_DATA[name] || { philCode: 'B' };
+  const phil = info.philCode;
+
+// 2. Select the Forward Tiers based on Identity
+  // We use offensiveFwdTiers as the "default" if no other match is found
+  let selectedFwdTiers = offensiveFwdTiers; 
+  
+  if (phil === 'R') {
+    selectedFwdTiers = rebuildingFwdTiers;
+  } else if (phil === 'O') {
+    selectedFwdTiers = offensiveFwdTiers;
+  } else if (phil === 'D') {
+    selectedFwdTiers = defensiveFwdTiers;
+  } else {
+    // This is for "Balanced" teams - they get a mix of top-end talent
+    selectedFwdTiers = offensiveFwdTiers; 
+  }
+  const fwdPositions = ['C','C','C','C','LW','LW','LW','LW','RW','RW','RW','RW'];
+  // Shuffle positions
+  for(let i=fwdPositions.length-1; i>0; i--){
+    const j = rnd(0,i);
+    [fwdPositions[i], fwdPositions[j]] = [fwdPositions[j], fwdPositions[i]];
+  }
+
+  // Create Forwards using the selected tier list
+  selectedFwdTiers.forEach(([oMin, oMax, aMin, aMax], i) => {
+    roster.push(newPlayer(fwdPositions[i], rnd(oMin, oMax), rnd(aMin, aMax)));
+  });
+
+  // 3. Select/Adjust Defense Tiers based on Identity
+  let selectedDefTiers = [
+    [84, 89, 22, 32], [81, 84, 22, 33], [79, 82, 23, 33],
+    [77, 80, 24, 34], [75, 78, 24, 35], [72, 76, 19, 35]
+  ];
+
+  if (phil === 'R') {
+    // Rebuilding defense is weaker and younger
+    selectedDefTiers = [
+      [80, 83, 19, 23], [78, 81, 20, 24], [76, 79, 21, 25],
+      [74, 77, 22, 26], [72, 75, 23, 27], [68, 72, 18, 30]
+    ];
+  } else if (phil === 'D') {
+    // Defensive teams get a slight boost to their Top 4 D
+    selectedDefTiers[0] = [87, 92, 24, 32];
+    selectedDefTiers[1] = [84, 87, 24, 32];
+  }
+
+  const defPositions = ['LD','RD','LD','RD','LD','RD'];
+  selectedDefTiers.forEach(([oMin, oMax, aMin, aMax], i) => {
+    roster.push(newPlayer(defPositions[i], rnd(oMin, oMax), rnd(aMin, aMax)));
+  });
+
+  // 4. Goalies
+  if (phil === 'R') {
+    roster.push(newPlayer('G', rnd(78, 82), rnd(20, 25))); // Weak young starter
+    roster.push(newPlayer('G', rnd(74, 77), rnd(20, 35))); // Backup
+  } else {
+    roster.push(newGoalie('starter'));
+    roster.push(newGoalie('backup'));
+  }
+  roster.push(newGoalie('depth'));
+
+  return { name, w: 0, l: 0, otl: 0, roster };
+}
+
+function teamOVR(roster){
+  if(!roster.length) return 0;
+  return Math.round(roster.reduce((s,p) => s+p.ovr, 0) / roster.length);
+}
+
+function capUsed(){ if(!state||!state.myTeam) return 0; return state.myTeam.roster.reduce((s,p) => s+p.salary, 0); }
+function capLeft(){ return BUDGET - capUsed(); }
+
+// ---- Salary Floor System ----
+// Calculate a team's total payroll in $M
+function teamPayroll(team){
+  if(!team || !team.roster) return 0;
+  return team.roster.reduce((s, p) => s + (p.salary || 0), 0);
+}
+
+// Calculate a team's total payroll as cap percentage
+function teamPayrollPct(team){
+  return Math.round(teamPayroll(team) / league.salaryCap * 1000) / 10;
+}
+
+// Check if a team is below the salary floor
+function isBelowFloor(team){
+  return teamPayroll(team) < league.capFloor;
+}
+
+// How much a team needs to spend to reach the floor (in $M)
+function floorDeficit(team){
+  return Math.max(0, Math.round((league.capFloor - teamPayroll(team)) * 100) / 100);
+}
+
+// Validate all teams before season starts — log warnings
+function validateSalaryFloors(){
+  let violations = 0;
+  allTeams().forEach(team => {
+    const pct = teamPayrollPct(team);
+    if(isBelowFloor(team)){
+      const deficit = floorDeficit(team);
+      console.warn(`[Salary Floor] ${team.name} is BELOW the floor at ${pct}% ($${teamPayroll(team).toFixed(1)}M) — needs $${deficit.toFixed(1)}M more`);
+      violations++;
+    } else {
+      console.log(`[Salary Floor] ${team.name} OK at ${pct}% ($${teamPayroll(team).toFixed(1)}M)`);
+    }
+  });
+  if(violations > 0){
+    console.warn(`[Salary Floor] ${violations} team(s) below the floor of ${league.capFloorPct}% ($${league.capFloor.toFixed(1)}M)`);
+  }
+  return violations;
+}
+
+// AI: if a team is below the floor, sign cheap FAs until they're compliant
+// Apply a temporary proportional payroll adjustment to meet the salary floor.
+// Does NOT change any player's actual contract — only adds a _floorAdj field
+// used purely for payroll display/calculation purposes.
+function applyFloorAdjustment(team){
+  if(!isBelowFloor(team)) return;
+
+  const originalPayroll = teamPayroll(team);
+  const originalPct = teamPayrollPct(team);
+  const deficit = league.capFloor - originalPayroll; // $M needed to reach floor
+
+  // Distribute the deficit proportionally based on each player's salary weight.
+  // Higher-paid players absorb a larger share of the adjustment.
+  const totalSalary = originalPayroll;
+  if(totalSalary <= 0) return;
+
+  team.roster.forEach(p => {
+    // Each player's share = their salary / total payroll * total deficit
+    const share = (p.salary / totalSalary) * deficit;
+    p._floorAdj = Math.round(share * 100) / 100; // store temporarily, do NOT touch p.salary
+  });
+
+  const adjustedPayroll = originalPayroll + deficit;
+  const adjustedPct = Math.round(adjustedPayroll / league.salaryCap * 1000) / 10;
+
+  console.log(
+    `[Salary Floor] ${team.name} payroll adjusted from ${originalPct}% ($${originalPayroll.toFixed(1)}M) ` +
+    `to ${adjustedPct}% ($${adjustedPayroll.toFixed(1)}M) | redistributed $${deficit.toFixed(2)}M across ${team.roster.length} players`
+  );
+}
+
+// Get a player's effective salary including any floor adjustment (for display only)
+function effectiveSalary(p){
+  return (p.salary || 0) + (p._floorAdj || 0);
+}
+
+// Get a team's effective payroll (actual + floor adjustment if any)
+function effectivePayroll(team){
+  if(!team || !team.roster) return 0;
+  return team.roster.reduce((s, p) => s + effectiveSalary(p), 0);
+}
+
+// Clear floor adjustments at end of season / when real signings happen
+function clearFloorAdjustments(team){
+  if(!team || !team.roster) return;
+  team.roster.forEach(p => { delete p._floorAdj; });
+}
+
+// ---- Team Data (Simplified for Randomization) ----
+const TEAM_DATA = {
+  'Ironwood Wolves':        { city:'Ironwood' },
+  'Lakeshore Falcons':      { city:'Lakeshore' },
+  'Northgate Lynx':         { city:'Northgate' },
+  'Riverbend Sharks':       { city:'Riverbend' },
+  'Coastal Fury':           { city:'Coastal City' },
+  'Midtown Thunder':        { city:'Midtown' },
+  'Highland Bears':         { city:'Highland' },
+  'Bayview Cranes':         { city:'Bayview' },
+  'Pinewood Predators':     { city:'Pinewood' },
+  'Coldwater Kings':        { city:'Coldwater' },
+  'Duskfall Ravens':        { city:'Duskfall' },
+  'Harborview Seals':       { city:'Harborview' },
+  'Ironclad Stallions':     { city:'Ironclad' },
+  'Ember Ridge Foxes':      { city:'Ember Ridge' },
+  'Stonewall Griffins':     { city:'Stonewall' },
+  'Summit City Eagles':     { city:'Summit City' },
+  'Frostpeak Yetis':        { city:'Frostpeak' },
+  'Crestline Cougars':      { city:'Crestline' },
+  'Delta Storm':            { city:'Delta' },
+  'Ashford Knights':        { city:'Ashford' },
+  'Tundra Bay Orcas':       { city:'Tundra Bay' },
+  'Redrock Outlaws':        { city:'Redrock' },
+  'Clearwater Herons':      { city:'Clearwater' },
+  'Westgate Titans':        { city:'Westgate' },
+  'Glacier Run Moose':      { city:'Glacier Run' },
+  'Prairie Wind Mustangs':  { city:'Prairie Wind' },
+  'Copperhead Rattlers':    { city:'Copperhead' },
+  'Thornfield Lions':       { city:'Thornfield' },
+  'Silver Lake Lynx':       { city:'Silver Lake' },
+  'Blackstone Phantoms':    { city:'Blackstone' },
+  'Maple Run Lumberjacks':  { city:'Maple Run' },
+  'Crescent Bay Marlins':   { city:'Crescent Bay' },
+};
+
+function randomizeLeagueIdentities() {
+  const names = Object.keys(TEAM_DATA);
+  
+  // Create a list of roles to distribute
+  // Adjust these numbers if you want more/less rebuilders
+  const roles = [
+    ...Array(6).fill({ p: 'Rebuilding', c: 'R' }),
+    ...Array(8).fill({ p: 'Offensive', c: 'O' }),
+    ...Array(8).fill({ p: 'Defensive', c: 'D' }),
+    ...Array(names.length - 22).fill({ p: 'Balanced', c: 'B' })
+  ];
+
+  // Shuffle the roles list
+  for (let i = roles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [roles[i], roles[j]] = [roles[j], roles[i]];
+  }
+
+  // Inject the roles into our TEAM_DATA object for this session
+  names.forEach((name, i) => {
+    TEAM_DATA[name].philosophy = roles[i].p;
+    TEAM_DATA[name].philCode = roles[i].c;
+  });
+  
+  console.log("League identities randomized!");
+}
+
+// ---- Game State ----
+const gameState = {
+  selectedTeam: null,
+  currentSeason: 1,
+};
+let gameStarted = false;
+let leagueGoalies90PlusCount = 0;
+let leagueGoalies88PlusCount = 0;
+
+const THEME_COLOR_KEYS = ['--text', '--text2', '--accent', '--ice', '--ice2'];
+const THEME_COLOR_DEFAULTS = {
+  '--text': '#ecf0f1',
+  '--text2': '#8facc8',
+  '--accent': '#2980b9',
+  '--ice': '#eaf2f8',
+  '--ice2': '#d4e6f5',
+};
+
+function normalizeHexColor(val){
+  if(!val) return '#ffffff';
+  const s = String(val).trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
+  const m = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if(m){
+    const h = n => ('0' + Math.min(255, Math.max(0, parseInt(n,10))).toString(16)).slice(-2);
+    return `#${h(m[1])}${h(m[2])}${h(m[3])}`;
+  }
+  return '#ffffff';
+}
+
+function applyThemeColors(map, save){
+  const root = document.documentElement;
+  THEME_COLOR_KEYS.forEach(k => {
+    if(map[k]) root.style.setProperty(k, map[k]);
+  });
+  if(save){
+    try {
+      const out = {};
+      THEME_COLOR_KEYS.forEach(k => { out[k] = getComputedStyle(root).getPropertyValue(k).trim() || map[k]; });
+      localStorage.setItem('hockeyGMThemeColors', JSON.stringify(out));
+    } catch(e){ console.warn('[Theme] Could not save', e); }
+  }
+}
+
+function loadThemeFromStorage(){
+  try {
+    const raw = localStorage.getItem('hockeyGMThemeColors');
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(!data || typeof data !== 'object') return;
+    applyThemeColors(data, false);
+  } catch(e){ console.warn('[Theme] Could not load', e); }
+}
+
+function applyOvrTierCSS() {
+  let css = '';
+  OVR_TIERS.forEach((tier, i) => {
