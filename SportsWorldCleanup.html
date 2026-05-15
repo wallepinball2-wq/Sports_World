@@ -1,0 +1,300 @@
+.dev-bar { height:3px; background:rgba(255,255,255,0.08); border-radius:2px; margin-top:4px; }
+.dev-fill { height:100%; border-radius:2px; background:var(--accent); transition:width 0.3s; }
+.lines-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+.line-card { background:var(--rink2); border:1px solid var(--border); border-radius:8px; padding:14px; }
+.line-card-title { font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+.line-card-ovr { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700; }
+.line-slot { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(100,160,220,0.07); }
+.line-slot:last-child { border-bottom:none; }
+.line-slot-pos { font-family:'Barlow Condensed',sans-serif; font-size:12px; font-weight:700; color:var(--text2); width:28px; }
+.line-slot-name { flex:1; font-size:13px; font-weight:500; }
+.line-slot-ovr { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700; }
+.line-slot-empty { color:var(--text2); font-style:italic; font-size:12px; }
+.line-effectiveness { height:4px; border-radius:2px; margin-top:8px; background:rgba(255,255,255,0.08); }
+.line-effectiveness-fill { height:100%; border-radius:2px; transition:width 0.3s; }
+/* Settings modal above main menu */
+#modal-settings.modal-overlay { z-index: 600; }
+.theme-color-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.theme-color-row label { font-size:12px; font-weight:600; color:var(--text2); text-transform:uppercase; letter-spacing:0.6px; flex:1; min-width:120px; }
+.theme-color-row input[type="color"] { width:48px; height:36px; padding:0; border:1px solid var(--border); border-radius:4px; cursor:pointer; background:transparent; }
+.theme-sample { font-size:13px; margin-top:14px; padding:12px; border-radius:6px; border:1px solid var(--border); background:rgba(255,255,255,0.03); }
+#screen-menu, #screen-teamsel { display:none; position:fixed; inset:0; z-index:500; background:var(--rink); overflow-y:auto; }
+#screen-menu.active, #screen-teamsel.active { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+#screen-teamsel.active { display:block; }
+.menu-title { font-family:'Barlow Condensed',sans-serif; font-size:72px; font-weight:800; text-transform:uppercase; letter-spacing:2px; line-height:1; text-align:center; }
+.menu-title span { color:var(--accent); }
+.menu-subtitle { font-size:16px; color:var(--text2); text-align:center; margin-top:8px; letter-spacing:2px; text-transform:uppercase; }
+.menu-btn { display:block; width:280px; padding:14px 24px; margin:10px auto; font-family:'Barlow Condensed',sans-serif; font-size:18px; font-weight:700; letter-spacing:1px; text-transform:uppercase; border-radius:6px; cursor:pointer; transition:all 0.15s; text-align:center; }
+.menu-btn-primary { background:var(--accent); border:none; color:#fff; }
+.menu-btn-primary:hover { background:#3498db; transform:translateY(-1px); }
+.menu-btn-secondary { background:transparent; border:1px solid var(--border); color:var(--text2); }
+.menu-btn-secondary:hover { border-color:var(--text2); color:var(--text); }
+.team-card { background:var(--rink2); border:1px solid var(--border); border-radius:8px; padding:14px 16px; cursor:pointer; transition:all 0.15s; }
+.team-card:hover { border-color:rgba(41,128,185,0.5); background:rgba(41,128,185,0.06); transform:translateY(-1px); }
+.team-card.selected { border-color:var(--accent); background:rgba(41,128,185,0.12); }
+.team-card-name { font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:800; }
+.team-card-city { font-size:12px; color:var(--text2); margin-top:1px; }
+.team-card-phil { display:inline-block; margin-top:6px; font-size:11px; padding:2px 8px; border-radius:3px; font-family:'Barlow Condensed',sans-serif; font-weight:700; letter-spacing:0.5px; }
+.phil-O { background:rgba(231,76,60,0.15); color:#e74c3c; }
+.phil-D { background:rgba(41,128,185,0.15); color:#5dade2; }
+.phil-B { background:rgba(46,204,113,0.15); color:#2ecc71; }
+.phil-R { background:rgba(243,156,18,0.15); color:#f39c12; }
+.teamsel-preview { background:rgba(255,255,255,0.04); border:1px solid rgba(100,160,220,0.2); border-radius:10px; padding:18px; width: 700px; min-width:520px; max-width:none; flex:0 0 900px; }
+.teamsel-preview .stat-card { min-height:88px; }
+.teamsel-preview .stat-card-val { font-size:30px; }
+.teamsel-preview th, .teamsel-preview td { font-size:13px; }
+.teamsel-preview td { color:var(--text2); }
+.teamsel-preview tbody tr:hover td { background: rgba(255,255,255,0.06); }
+#teamsel-grid { display:grid; grid-template-columns: repeat(6, 1fr); gap:12px; margin-bottom:28px; overflow-y:visible; padding-right:6px; flex:1; }
+#teamsel-preview { position:relative; }
+@media (max-width: 860px) { #teamsel-grid { max-height: initial; } #teamsel-preview { position:relative; } #teamsel-main { flex-direction:column; } }
+.rink-lines { position:fixed; inset:0; pointer-events:none; background:
+  linear-gradient(90deg, transparent 49.5%, rgba(100,160,220,0.04) 49.5%, rgba(100,160,220,0.04) 50.5%, transparent 50.5%),
+  linear-gradient(0deg, transparent 19.5%, rgba(200,80,60,0.06) 19.5%, rgba(200,80,60,0.06) 20.5%, transparent 20.5%),
+  linear-gradient(0deg, transparent 79.5%, rgba(200,80,60,0.06) 79.5%, rgba(200,80,60,0.06) 80.5%, transparent 80.5%); }
+/* --- nav menu --- */
+.nav-bar { display:flex; gap:6px; margin-bottom:0; flex-wrap:wrap; border-bottom:1px solid var(--border); padding-bottom:0; }
+.nav-group-btn {
+  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:700;
+  letter-spacing:0.5px; text-transform:uppercase;
+  padding:8px 16px; border:none; border-bottom:3px solid transparent;
+  background:none; color:var(--text2); cursor:pointer;
+  transition:all 0.15s; margin-bottom:-1px;
+  display:flex; align-items:center; gap:6px;
+}
+.nav-group-btn:hover { color:var(--text); }
+.nav-group-btn.active { color:var(--ice); border-bottom-color:var(--accent); }
+.nav-submenu {
+  display:none; flex-wrap:wrap; gap:4px;
+  padding:10px 0 12px; border-bottom:1px solid var(--border);
+  margin-bottom:16px;
+}
+.nav-submenu.active { display:flex; }
+.nav-sub-btn {
+  font-family:'Barlow Condensed',sans-serif; font-size:13px; font-weight:600;
+  padding:5px 14px; border-radius:4px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,0.02); color:var(--text2);
+  cursor:pointer; transition:all 0.12s; letter-spacing:0.3px;
+}
+.nav-sub-btn:hover { background:rgba(255,255,255,0.06); color:var(--text); border-color:rgba(100,160,220,0.3); }
+.nav-sub-btn.active { background:rgba(41,128,185,0.15); color:var(--ice); border-color:var(--accent); }
+.nav-sub-btn.future { opacity:0.4; cursor:default; font-style:italic; }
+.nav-sub-btn.offseason-only { display:none; }
+.nav-sub-btn.offseason-only.visible { display:inline-block; }
+/* --- scrollbar --- */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(100,160,220,0.2); border-radius: 3px; }
+
+@media (max-width: 600px) {
+  .trade-grid { grid-template-columns: 1fr; }
+  .header-stats { gap: 12px; }
+  .hstat-val { font-size: 18px; }
+}
+</style>
+<script>
+// --- GLOBAL SETTINGS & CACHES ---
+let teamPreviewCache = {}; // Fixes the "Initialization" error
+const OVR_TIER_DEFAULTS = [
+  { min: 90, label: 'Elite', color: '#5dade2' },
+  { min: 85, label: 'Star', color: '#2ecc71' },
+  { min: 80, label: 'Core', color: '#f1c40f' },
+  { min: 0,  label: 'Depth', color: '#e74c3c' }
+];
+
+function loadGame() {
+  try {
+    const saved = localStorage.getItem('hockeyGMSave');
+    if (!saved) {
+      showFlash('No Save Found', 'Start a new game first!', 'otl');
+      return;
+    }
+    state = JSON.parse(saved);
+    gameStarted = true;
+    renderAll();
+    showTab('roster');
+    showNavGroup('team');
+    const menu = document.getElementById('screen-menu');
+    if (menu) menu.classList.remove('active');
+    showFlash('Welcome Back!', 'Game loaded successfully.', 'win');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function showSettings() {
+  const modal = document.getElementById('modal-settings');
+  if (modal) {
+    modal.classList.add('open');
+    renderOvrTierEditor(); // Ensures the editor is ready when opened
+    syncThemeColorPickers(); // Syncs the theme colors
+  }
+}
+
+// Load OVR_TIERS from storage
+let OVR_TIERS = JSON.parse(localStorage.getItem('hockeyGMOvrTiers')) || JSON.parse(JSON.stringify(OVR_TIER_DEFAULTS));
+
+// ... rest of your script
+// Early shim so nav group buttons work before main script loads
+function showNavGroup(group){
+  document.querySelectorAll('.nav-group-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.nav-submenu').forEach(s=>s.classList.remove('active'));
+  const btn = document.getElementById('navg-'+group);
+  const sub = document.getElementById('sub-'+group);
+  if(btn) btn.classList.add('active');
+  if(sub) sub.classList.add('active');
+}
+
+// ADD THIS NEW FUNCTION HERE:
+function showTeamSelect() {
+  // Hide the main menu
+  const menu = document.getElementById('screen-menu');
+  if (menu) menu.classList.remove('active');
+  
+  // Show the team selection screen
+  const teamSel = document.getElementById('screen-teamsel');
+  if (teamSel) teamSel.classList.add('active');
+  
+  // Try to build the team list if the main script is ready
+  if (typeof renderTeamSelectGrid === 'function') {
+    renderTeamSelectGrid();
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- MAIN MENU -->
+<div id="screen-menu" class="active">
+  <div class="rink-lines"></div>
+  <div style="position:relative;z-index:1;width:100%;max-width:500px;padding:40px 20px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:16px;">🏒</div>
+    <div class="menu-title">Hockey<br><span>GM</span></div>
+    <div class="menu-subtitle">General Manager Simulator</div>
+    <div style="margin-top:48px;">
+      <button class="menu-btn menu-btn-primary" onclick="showTeamSelect()">▶ Start New Game</button>
+      <button class="menu-btn menu-btn-secondary" onclick="loadGame()">📂 Load Game</button>
+      <button class="menu-btn menu-btn-secondary" onclick="showSettings()">⚙️ Settings</button>
+    </div>
+    <div style="margin-top:48px;font-size:11px;color:var(--text2);letter-spacing:1px;">v0.1 · Early Access</div>
+  </div>
+</div>
+
+<!-- SETTINGS (main menu) -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal" style="width:700px; max-width:96vw; max-height:85vh; overflow-y:auto;">
+    <h2>Display &amp; Fonts</h2>
+    <p style="font-size:13px; color:var(--text2); margin-bottom:14px; line-height:1.45;">
+      These colors control most text in the game. Changes apply immediately and are saved in this browser.
+    </p>
+
+    <div class="theme-color-row">
+      <label for="theme-color-text">Main text</label>
+      <input type="color" id="theme-color-text" title="Body and primary UI text">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-text2">Muted text</label>
+      <input type="color" id="theme-color-text2" title="Labels, subtitles, secondary lines">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-accent">Accent &amp; links</label>
+      <input type="color" id="theme-color-accent" title="Highlights, GM title accent, borders tint">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-ice">Bright text</label>
+      <input type="color" id="theme-color-ice" title="Active tabs, nav highlights, emphasis">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-ice2">Soft bright text</label>
+      <input type="color" id="theme-color-ice2" title="Alternate highlights">
+    </div>
+
+    <div class="theme-sample">
+      <span style="color:var(--text);font-weight:600;">Sample body</span>
+      <span style="color:var(--text2);"> · muted</span>
+      <span style="color:var(--accent);"> · accent</span>
+      <span style="color:var(--ice);"> · bright</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">Goalie Workload Split</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">How many games the starting goalie plays vs the backup. NHL average is around 60–65%.</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <input type="range" id="goalie-split-slider" min="50" max="85" step="1"
+        value="65"
+        oninput="updateGoalieSplit(this.value)"
+        style="flex:1;">
+      <span id="goalie-split-label" style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;min-width:80px;">65% / 35%</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);">
+      Starter plays ~<span id="goalie-split-games">53</span> of 82 games · Backup plays ~<span id="goalie-split-backup-games">29</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">OVR Tier Colors &amp; Labels</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Customize the color and name shown for each overall rating range.</p>
+    <div id="ovr-tier-editor"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" class="btn" onclick="resetOvrTiers()">Reset OVR defaults</button>
+    </div>
+
+    <div class="modal-actions" style="margin-top:18px;flex-wrap:wrap;">
+      <button type="button" class="btn" onclick="resetThemeColors()">Reset theme</button>
+      <button type="button" class="btn btn-primary" onclick="closeModal('modal-settings')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM SELECTION -->
+<div id="screen-teamsel">
+  <div class="rink-lines"></div>
+  <div style="position:relative;z-index:1;width:100%;max-width:1200px;margin:0;padding:32px 20px 60px;">
+    <button onclick="showMenu()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;margin-bottom:24px;">← Back</button>
+    <div class="menu-title" style="font-size:36px;text-align:left;margin-bottom:4px;">Select Your <span>Team</span></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:24px;">Choose the franchise you'll manage. Each team has a different philosophy and identity.</div>
+
+    <div id="teamsel-main" style="display:flex; gap:20px; align-items:flex-start;">
+      <div id="teamsel-preview" class="teamsel-preview">
+        <div class="stat-grid" id="teamsel-statgrid">
+          <div class="stat-card"><div class="stat-card-label">Team Overall</div><div class="stat-card-val" id="teamsel-ovr">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Forward Overall</div><div class="stat-card-val" id="teamsel-fwd">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Defense Overall</div><div class="stat-card-val" id="teamsel-def">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Goalie Overall</div><div class="stat-card-val" id="teamsel-goal">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Roster Size</div><div class="stat-card-val" id="teamsel-roster-size">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Average Age</div><div class="stat-card-val" id="teamsel-avg-age">—</div></div>
+        </div>
+        <div style="margin-top:18px;">
+          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Roster Preview</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Player</th>
+                  <th>Pos</th>
+                  <th>OVR</th>
+                  <th>Salary</th>
+                </tr>
+              </thead>
+              <tbody id="teamsel-roster"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="teamsel-grid"></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;position:sticky;bottom:20px;background:var(--rink);padding:16px 0;border-top:1px solid var(--border);">
+      <div id="teamsel-info" style="flex:1;font-size:13px;color:var(--text2);">No team selected</div>
+      <button id="teamsel-confirm" class="menu-btn menu-btn-primary" style="width:auto;padding:12px 32px;opacity:0.4;pointer-events:none;" onclick="confirmTeamSelect()">Start as GM →</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="team-logo" id="hdr-logo">IW</div>
