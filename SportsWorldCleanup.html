@@ -3202,3 +3202,276 @@ function quitToMainMenu(){
   closeModal('modal-pause');
   showMenu();
 }
+// ---- game sim ----
+function simOneGame(myTeam, oppTeam, homeBoost=0, awayBoost=0){
+  const myBase = (myTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(myTeam.roster)) + homeBoost;
+  const oppBase = (oppTeam.name===state.myTeam.name && state.lines ? linesEffectiveness() : teamOVR(oppTeam.roster)) + awayBoost;
+  
+  // STAT REALISM FIX: Lowered multipliers for better Save %
+  const myStr = myBase + rnd(-10, 10);
+  const oppStr = oppBase + rnd(-10, 10);
+  const myAvg = 2.5 + Math.max(0,(myStr-oppStr)*0.05); 
+  const oppAvg = 2.5 + Math.max(0,(oppStr-myStr)*0.05);
+
+  let mg = Math.round(Math.max(0, myAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
+  let og = Math.round(Math.max(0, oppAvg + (rnd(0,10)+rnd(0,10))/5 - 2));
+  if(mg===og){ if(Math.random()<0.5) mg++; else og++; }
+
+  let result;
+  if(mg>og){ myTeam.w++; result='W'; }
+  else if(mg<og){ myTeam.l++; oppTeam.w++; result='L'; }
+  else { myTeam.otl++; oppTeam.w++; result='OTL'; }
+
+  const isMyHome = myTeam.name===state.myTeam.name;
+  const isMyAway = oppTeam.name===state.myTeam.name;
+
+  // IMPORTANT: We pass mg and og here so the Goalie gets the Win/Loss correctly
+  assignGoalsToTeam(myTeam, mg, isMyHome, mg, og);
+  assignGoalsToTeam(oppTeam, og, isMyAway, mg, og);
+  
+  assignPlusMinus(myTeam, mg, og);
+  assignPlusMinus(oppTeam, og, mg);
+
+  // SKATERS GP: Only give +1 to non-goalies
+  myTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
+  oppTeam.roster.forEach(p => { if(p.pos !== 'G') { let s = getStatLine(p); s.gp = (s.gp||0)+1; } });
+
+  if (typeof incrementGP === 'undefined') {
+    window.incrementGP = function(team) { /* Already handled */ };
+  }
+
+  // THIS WAS MISSING: You need to return the result and close the function
+  return { result, mg, og, opp: oppTeam.name };
+}
+// ================================================================
+// CALENDAR + WEEKLY SIMULATION ENGINE
+// Master controller for all league flow and phase transitions.
+// ================================================================
+
+
+// ----------------------------------------------------------------
+// CALENDAR — date-based season from Oct to Apr
+// ----------------------------------------------------------------
+
+function freshCalendar(year){
+  return {
+    year: year || 2025,
+    phase: PHASES.REGULAR_SEASON,
+    week: 1,
+    currentMonth: 0,  // index into SEASON_MONTHS (0=October)
+    currentDay: 1,
+    regularSeasonWeeks: 28,
+    tradeDeadlineWeek: 20,
+    viewMonth: 0,     // which month the calendar tab is showing
+  };
+}
+
+// Build a date key string
+function dateKey(monthIdx, day){ return `${monthIdx}-${day}`; }
+
+// Generate schedule: assign each game to a specific date (month+day)
+// Returns: { byWeek: [[{home,away,month,day}]], byDate: { "monthIdx-day": [{home,away}] } }
+function generateSchedule(){
+  const teams = allTeams().map(t => t.name);
+  const playCount = {};
+  teams.forEach(a => teams.forEach(b => { playCount[a+'|'+b] = 0; }));
+
+  const byWeek = [];   // array of weeks, each week = array of game objects
+  const byDate = {};   // dateKey → [game objects]
+
+  let weekIdx = 0;
+  let totalWeeks = 28;
+
+  // Walk through each month/day and assign games on GAME_DAYS
+  for(let mIdx = 0; mIdx < SEASON_MONTHS.length && weekIdx < totalWeeks; mIdx++){
+    const month = SEASON_MONTHS[mIdx];
+    // Get first day of this month (simplified: Oct 1 = Tuesday=day2, advance from there)
+    // We use a fixed start: Oct 1 2025 = Wednesday (day 3), but simplify to always start week on Sunday
+    const monthStartDow = (mIdx === 0) ? 3 : 0; // Oct starts mid-week, rest simplified
+
+    for(let day = 1; day <= month.days && weekIdx < totalWeeks; day++){
+      // Day of week (0=Sun): rough calculation from season start
+      const dayOfSeason = SEASON_MONTHS.slice(0, mIdx).reduce((s,m)=>s+m.days,0) + day - 1;
+      const dow = (dayOfSeason + 3) % 7; // Oct 1 2025 = Wednesday=3
+
+      // Is this a game day?
+      if(!GAME_DAYS.includes(dow)) continue;
+
+      // Build week grouping: every 7 days = 1 week
+      const wk = Math.floor(dayOfSeason / 7);
+      if(wk >= totalWeeks) break;
+      while(byWeek.length <= wk) byWeek.push([]);
+
+      // Schedule 16 games on this day (all 32 teams play)
+      const available = [...teams];
+      for(let i = available.length-1; i > 0; i--){
+        const j = rnd(0, i);
+        [available[i], available[j]] = [available[j], available[i]];
+      }
+      const used = new Set();
+      while(available.length >= 2){
+        const home = available.find(t => !used.has(t));
+        if(!home) break;
+        const candidates = available.filter(t => t !== home && !used.has(t));
+        if(!candidates.length) break;
+        candidates.sort((a,b) => playCount[home+'|'+a] - playCount[home+'|'+b]);
+        const away = candidates[0];
+        const game = { home, away, monthIdx: mIdx, day, monthName: month.name };
+        byWeek[wk].push(game);
+        const dk = dateKey(mIdx, day);
+        if(!byDate[dk]) byDate[dk] = [];
+        byDate[dk].push(game);
+        playCount[home+'|'+away]++;
+        playCount[away+'|'+home]++;
+        used.add(home); used.add(away);
+        available.splice(available.indexOf(home), 1);
+        available.splice(available.indexOf(away), 1);
+      }
+    }
+  }
+
+  return { byWeek, byDate };
+}
+
+// ----------------------------------------------------------------
+// PROCESS ONE WEEK — the core simulation unit
+// Simulates ALL games in the current calendar week.
+// ----------------------------------------------------------------
+function processWeekGames(){
+  const cal = state.calendar;
+  const weekIdx = cal.week - 1;
+  const weekGames = (state.schedule.byWeek && state.schedule.byWeek[weekIdx]) || [];
+  let myResults = [];
+
+  weekGames.forEach(g => {
+    const home = getTeamByName(g.home);
+    const away = getTeamByName(g.away);
+    if(!home || !away) return;
+    const isMyHome = g.home === state.myTeam.name;
+    const isMyAway = g.away === state.myTeam.name;
+    const result = simOneGame(home, away);
+    if(isMyHome || isMyAway){
+      const myResult = isMyHome ? result.result : (result.result==='W'?'L':result.result==='L'?'W':'OTL');
+      const myG = isMyHome ? result.mg : result.og;
+      const oppG = isMyHome ? result.og : result.mg;
+      const oppName = isMyHome ? g.away : g.home;
+      // Store result on the game object for calendar display
+      g.result = myResult; g.myG = myG; g.oppG = oppG;
+      myResults.push({ result: myResult, myG, oppG, oppName, monthName: g.monthName, day: g.day });
+      if(myResult==='W') state.morale = Math.min(5, state.morale+1);
+      else if(myResult==='L') state.morale = Math.max(-5, state.morale-1);
+    }
+  });
+
+  simAffiliateGame(state.ahl);
+  simAffiliateGame(state.echl);
+  // Development happens once at offseason (startOffseason), not weekly
+  return myResults;
+}
+
+// ----------------------------------------------------------------
+// CHECK PHASE TRANSITIONS
+// Called after each week to auto-advance phases.
+// ----------------------------------------------------------------
+function checkPhaseTransition(){
+  const cal = state.calendar;
+
+  if(cal.phase === PHASES.REGULAR_SEASON){
+    // Trade deadline notification
+    if(cal.week === cal.tradeDeadlineWeek){
+      cal.phase = PHASES.TRADE_DEADLINE;
+      state.log.push('🔔 Trade Deadline Week! Make your moves before the deadline passes.');
+      showFlash('Trade Deadline!', 'Last chance to make trades.', 'otl');
+      return true;
+    }
+    // End of regular season
+    if(cal.week > cal.regularSeasonWeeks){
+      cal.phase = PHASES.PLAYOFFS;
+      state.log.push('🏒 Regular season complete!');
+      startPlayoffs();
+      return true;
+    }
+  }
+
+  if(cal.phase === PHASES.TRADE_DEADLINE){
+    // After deadline week, resume regular season
+    if(cal.week > cal.tradeDeadlineWeek){
+      cal.phase = PHASES.REGULAR_SEASON;
+    }
+  }
+
+  return false;
+}
+
+// ----------------------------------------------------------------
+// SIM WEEK — advances calendar by 1 week and processes all games
+// This is what the "Sim 1 Week" button calls.
+// ----------------------------------------------------------------
+function simWeek(){
+  if(!state || !state.calendar){ console.error('[simWeek] state.calendar is undefined'); return; }
+  const cal = state.calendar;
+  console.log(`[simWeek] Week ${cal.week} | Phase: ${cal.phase}`);
+
+  // Guard: only sim during regular season / trade deadline
+  if(cal.phase === PHASES.PLAYOFFS){
+    showFlash('Playoffs!', 'Use the bracket to sim playoff series.', 'otl');
+    return;
+  }
+  if(cal.phase === PHASES.DRAFT || cal.phase === PHASES.RESIGN ||
+     cal.phase === PHASES.FREE_AGENCY || cal.phase === PHASES.OFFSEASON){
+    showFlash('Offseason', 'Complete offseason tasks first.', 'otl');
+    return;
+  }
+  if(cal.week > cal.regularSeasonWeeks){
+    if(!state.playoffsStarted){ startPlayoffs(); }
+    return;
+  }
+
+  // Process all games this week
+  const myResults = processWeekGames();
+
+  // Log results for player's team
+  if(myResults.length > 0){
+    myResults.forEach(r => {
+      const cls = r.result==='W'?'res-W':r.result==='L'?'res-L':'res-OTL';
+      const dateStr = r.monthName && r.day ? ` ${r.monthName.slice(0,3)} ${r.day}` : ` Wk${cal.week}`;
+      state.log.push(`<span class="wk">${dateStr}</span><span class="${cls}">${r.result}</span> vs ${r.oppName} — ${r.myG}–${r.oppG}`);
+    });
+    // Flash last result
+    const last = myResults[myResults.length-1];
+    const flashLabel = last.result==='W'?'Victory!':last.result==='L'?'Defeat':'Overtime Loss';
+    const flashC = last.result==='W'?'win':last.result==='L'?'loss':'otl';
+    showFlash(`${flashLabel} (${myResults.length} games)`, `Week ${cal.week} complete`, flashC);
+  } else {
+    state.log.push(`<span class="wk">Wk${cal.week}</span> No games scheduled`);
+  }
+
+  // Advance calendar
+  cal.week++;
+  state.week = cal.week;
+  // Update currentMonth/currentDay based on week
+  // Each week = 7 days from season start (Oct 1)
+  const dayOfSeason = (cal.week - 1) * 7;
+  let rem = dayOfSeason;
+  for(let m=0; m<SEASON_MONTHS.length; m++){
+    if(rem < SEASON_MONTHS[m].days){ cal.currentMonth=m; cal.currentDay=rem+1; break; }
+    rem -= SEASON_MONTHS[m].days;
+  }
+
+  // Check for phase transitions
+  checkPhaseTransition();
+
+  renderAll();
+  if(document.querySelector('.tab-btn.active')?.textContent.trim()==='Game Log') showTab('log');
+}
+
+// ----------------------------------------------------------------
+// SIM SEASON — fast-forward entire regular season
+// ----------------------------------------------------------------
+function simSeason(){
+  const cal = state.calendar;
+
+  if(cal.phase === PHASES.PLAYOFFS || cal.week > cal.regularSeasonWeeks){
+    showFlash('Already done!', 'Regular season is over.', 'otl');
+    return;
+  }   
