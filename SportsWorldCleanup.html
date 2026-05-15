@@ -2697,3 +2697,303 @@ function initPickInventory(){
     }
   });
 }
+
+      // Transfer pick ownership in inventory
+  trade.myPicks.forEach(pk=>{
+    const inv = state.pickInventory.find(p=>p.id===pk.id);
+    if(inv) inv.ownerTeam = tname;
+  });
+  trade.theirPicks.forEach(pk=>{
+    const inv = state.pickInventory.find(p=>p.id===pk.id);
+    if(inv) inv.ownerTeam = state.myTeam.name;
+  });
+
+  const sent = [...myPlayerNames.filter(Boolean), ...trade.myPicks.map(pk=>pickLabel(pk))].join(', ');
+  const recv = [...theirPlayerNames.filter(Boolean), ...trade.theirPicks.map(pk=>pickLabel(pk))].join(', ');
+  autoSetLines();
+  state.log.push(`📦 TRADE with ${tname} — Sent: ${sent} | Received: ${recv}`);
+  showFlash('Trade Complete!', `Deal done with ${tname}`, 'otl');
+  clearTrade();
+  renderAll();
+}
+
+// ---- sign/release ----
+// ---- Personality System ----
+// Trait system removed
+
+function traitContractMod(p){ return 1; }
+function traitFAWillingness(p, targetTeam){ return 1; }
+function traitPlayoffBoost(p){ return 0; }
+function traitInjuryMod(p){ return 0; }
+function logPlayerTraits(players){}
+
+// ---- Stats System ----
+function freshStats(pos){
+  if(pos === 'G'){
+    return { gp:0, w:0, l:0, ga:0, saves:0, sa:0 };
+  }
+  return { gp:0, g:0, a:0, pm:0 }; // gp, goals, assists, plus/minus
+}
+
+function freshPlayoffStats(pos){
+  if(pos === 'G') return { gp:0, w:0, l:0, ga:0, saves:0, sa:0 };
+  return { gp:0, g:0, a:0, pm:0 };
+}
+
+function getPlayoffStatLine(p){
+  if(!p.playoffStats) p.playoffStats = freshPlayoffStats(p.pos);
+  return p.playoffStats;
+}
+
+// Career totals structure — separate from season stats
+function freshCareerTotals(pos){
+  if(pos === 'G') return { gp:0, w:0, l:0, ga:0, saves:0, sa:0 };
+  return { gp:0, g:0, a:0, pm:0 };
+}
+
+// Archive a player's current season stats into their history, update career totals
+function archivePlayerSeason(p, season, teamName){
+  if(!p.stats) return;
+  if(!p.seasonHistory) p.seasonHistory = [];
+  if(!p.careerTotals) p.careerTotals = freshCareerTotals(p.pos);
+
+  // Build season record
+  const record = { season, team: teamName, ...p.stats };
+  p.seasonHistory.push(record);
+
+  // Update career totals
+  Object.keys(p.careerTotals).forEach(key => {
+    p.careerTotals[key] = (p.careerTotals[key] || 0) + (p.stats[key] || 0);
+  });
+
+  console.log(`[Career] Season ${season} stats archived for ${p.name} — ${p.pos==='G'
+    ? `${p.stats.w||0}W ${p.stats.l||0}L`
+    : `${p.stats.g||0}G ${p.stats.a||0}A ${(p.stats.g||0)+(p.stats.a||0)}PTS`}`);
+
+  // Reset current season stats
+  p.stats = freshStats(p.pos);
+}
+
+// Archive all players on a team at season end
+function archiveTeamSeasonStats(team, season){
+  if(!team || !team.roster) return;
+  team.roster.forEach(p => archivePlayerSeason(p, season, team.name));
+}
+
+function getStatLine(p){
+  if(!p.stats) p.stats = freshStats(p.pos);
+  return p.stats;
+}
+
+function calcSV(p){ // save percentage
+  const s = getStatLine(p);
+  return s.sa > 0 ? (s.saves/s.sa) : 0;
+}
+
+function calcGAA(p){ // goals against average
+  const s = getStatLine(p);
+  return s.gp > 0 ? (s.ga/s.gp).toFixed(2) : '0.00';
+}
+
+function calcPTS(p){
+  const s = getStatLine(p);
+  return (s.g||0) + (s.a||0);
+}
+
+// Assign goals/assists to random players on a team for a given goal count
+function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
+  if(!team.roster.length) return;
+  const skaters = team.roster.filter(p=>p.pos!=='G');
+  const goalies = team.roster.filter(p=>p.pos==='G');
+
+  // A. Handle Skaters (Goals and Assists)
+  if(goals > 0) {
+    for(let i=0; i<goals; i++){
+      const scorer = weightedPick(skaters, 'shootingAccuracy');
+      if(scorer){
+        getStatLine(scorer).g++;
+      }
+      const numAssists = Math.random()<0.15 ? 1 : Math.random()<0.5 ? 2 : 1;
+      const helpers = skaters.filter(p=>p!==scorer);
+      for(let j=0; j<Math.min(numAssists,helpers.length); j++){
+        const helper = weightedPick(helpers, 'passing');
+        if(helper) getStatLine(helper).a++;
+      }
+    }
+  }
+
+  // B. Handle Goalie (GP, Saves, W/L)
+  if(goalies.length){
+    // Determine which goalie plays (75% starter, 25% backup)
+    const useStarter = Math.random() * 100 < (league.starterSharePct || 75);
+    const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
+    
+    const saves = rnd(18, 35);
+    const s = getStatLine(goalie);
+    
+    s.ga += goals;
+    s.saves += saves;
+    s.sa += goals + saves;
+    s.gp = (s.gp || 0) + 1; // THE ONLY GP ADDITION
+
+    // Win/Loss logic
+    const teamWon = (isMyTeam && mg > og) || (!isMyTeam && og > mg);
+    if(teamWon) s.w = (s.w||0)+1; else s.l = (s.l||0)+1;
+  }
+}
+
+function assignPlusMinus(team, goalsFor, goalsAgainst){
+  const skaters = [...team.roster].filter(p=>p.pos!=='G')
+    .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
+  skaters.forEach(p=>{
+    getStatLine(p).pm += (goalsFor - goalsAgainst);
+  });
+}
+function assignPlusMinus(team, goalsFor, goalsAgainst){
+  // Top 6 forwards and top 4 D roughly track +/-
+  const skaters = [...team.roster].filter(p=>p.pos!=='G')
+    .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
+  skaters.forEach(p=>{
+    getStatLine(p).pm += goalsFor - goalsAgainst;
+  });
+}
+// Goalie stats inside assignGoalsToTeam
+  if(goalies.length){
+    const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
+    const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
+    
+    const saves = rnd(18, 35);
+    const s = getStatLine(goalie);
+    
+    s.ga += goals;
+    s.saves += saves;
+    s.sa += goals + saves;
+    s.gp = (s.gp || 0) + 1; // This is now the ONLY +1 GP for goalies
+
+    // Add Win/Loss logic here:
+    // If it's my team and we scored more than the opponent, it's a win
+    const teamWon = (isMyTeam && mg > og) || (!isMyTeam && og > mg);
+    if(teamWon) s.w = (s.w||0)+1; else s.l = (s.l||0)+1;
+  }
+
+function weightedPick(players, attr){
+  if(!players.length) return null;
+  // Use specific attribute for weighting if available, else fall back to OVR
+  const total = players.reduce((s,p)=>s + (p.attrs&&attr ? (p.attrs[attr]||p.ovr) : p.ovr), 0);
+  let r = Math.random()*total;
+  for(const p of players){
+    r -= (p.attrs&&attr ? (p.attrs[attr]||p.ovr) : p.ovr);
+    if(r<=0) return p;
+  }
+  return players[players.length-1];
+}
+
+function resetSeasonStats(team){
+  team.roster.forEach(p=>{ p.stats = freshStats(p.pos); });
+}
+
+function newFAPlayer(){
+  const ovr = rnd(60,72); // FA pool: mostly depth/fringe players
+  const age = rnd(18,35);
+  const pos = pick(POSITIONS);
+  const archetype = pickArchetype(pos);
+  const attrs = genAttributes(pos, ovr, archetype);
+  const pct = salaryToCapPct(0.775);
+  return { id:Math.random().toString(36).slice(2,9), name:pname(), pos, ovr:ovr, age, salary:0.775, capPct:pct, years:1, archetype, attrs, stats: freshStats(pos), playoffStats: freshPlayoffStats(pos), seasonHistory: [], careerTotals: freshCareerTotals(pos) };
+}
+
+// ----------------------------------------------------------------
+// NMC / NTC CLAUSE SYSTEM
+// NMC = No-Movement Clause: can't be traded or sent to minors
+// NTC = No-Trade Clause: submits list of 10 blocked teams
+// Modified NMC = NMC for first N years, then converts to NTC
+// ----------------------------------------------------------------
+
+// Determine what clause (if any) a player demands
+function playerClauseDemand(p, offeredYrs){
+  // Only veterans on multi-year deals demand clauses
+  if(p.isELC) return null;
+  if(offeredYrs < 2) return null;
+
+  const roll = rnd(1,100);
+  // Full NMC: elite players 30+ on long deals
+  if(p.ovr >= 90 && p.age >= 30 && offeredYrs >= 4 && roll <= 70) return 'NMC';
+  if(p.ovr >= 88 && p.age >= 32 && offeredYrs >= 3 && roll <= 60) return 'NMC';
+  // Modified NMC: stars 28+ wanting security
+  if(p.ovr >= 87 && p.age >= 28 && offeredYrs >= 4 && roll <= 55) return 'M-NMC';
+  if(p.ovr >= 85 && p.age >= 30 && offeredYrs >= 3 && roll <= 45) return 'M-NMC';
+  // NTC: solid players wanting some control
+  if(p.ovr >= 83 && p.age >= 27 && offeredYrs >= 3 && roll <= 40) return 'NTC';
+  if(p.ovr >= 80 && p.age >= 30 && offeredYrs >= 2 && roll <= 25) return 'NTC';
+  return null;
+}
+
+// Generate a random NTC blocked team list (10 teams player won't go to)
+function generateNTCList(){
+  const teams = [...TEAM_NAMES].filter(n=>n!==state.myTeam.name);
+  const shuffled = teams.sort(()=>Math.random()-0.5);
+  return shuffled.slice(0,10);
+}
+
+// Check if player can be traded
+function canTrade(p, targetTeamName){
+  if(!p.clause) return { allowed:true };
+  if(p.clause==='NMC') return { allowed:false, reason:`${p.name} has a No-Movement Clause and cannot be traded.` };
+  if(p.clause==='M-NMC'){
+    // NMC for first half of contract, NTC for second half
+    const nmcYears = Math.ceil(p.clauseYears / 2);
+    const yearsServed = p.clauseYears - p.years;
+    if(yearsServed < nmcYears) return { allowed:false, reason:`${p.name} has a Modified NMC (${nmcYears - yearsServed} NMC year${nmcYears-yearsServed>1?'s':''} remaining).` };
+    // NTC phase — check blocked teams
+    if(p.ntcList && targetTeamName && p.ntcList.includes(targetTeamName))
+      return { allowed:false, reason:`${p.name}'s NTC blocks a trade to ${targetTeamName}.` };
+  }
+  if(p.clause==='NTC'){
+    if(p.ntcList && targetTeamName && p.ntcList.includes(targetTeamName))
+      return { allowed:false, reason:`${p.name}'s No-Trade Clause blocks a trade to ${targetTeamName}.` };
+  }
+  return { allowed:true };
+}
+
+// Can be sent to minors?
+function canSendToMinors(p){
+  if(!p.clause) return { allowed:true };
+  if(p.clause==='NMC') return { allowed:false, reason:`${p.name} has a No-Movement Clause and cannot be sent to the minors.` };
+  if(p.clause==='M-NMC'){
+    const nmcYears = Math.ceil(p.clauseYears / 2);
+    const yearsServed = p.clauseYears - p.years;
+    if(yearsServed < nmcYears) return { allowed:false, reason:`${p.name} has a Modified NMC — cannot be sent down yet.` };
+  }
+  return { allowed:true };
+}
+
+// Clause badge for UI
+function clauseBadge(p){
+  if(!p.clause) return '';
+  const colors = { NMC:'#e74c3c', 'M-NMC':'#f39c12', NTC:'#5dade2' };
+  const c = colors[p.clause] || 'var(--text2)';
+  return `<span title="${p.clause==='NMC'?'No-Movement Clause':p.clause==='M-NMC'?'Modified NMC':'No-Trade Clause'}" style="font-size:10px;font-family:'Barlow Condensed',sans-serif;font-weight:700;padding:1px 5px;border-radius:3px;background:${c}22;color:${c};border:1px solid ${c}55;cursor:help;margin-left:4px;">${p.clause}</span>`;
+}
+
+function playerAsk(p){
+  const base = salFromOVR(p.ovr);
+  const wantYears = p.age <= 28 ? Math.min(8, contractYears(p.ovr, p.age)) : Math.max(1, contractYears(p.ovr, p.age));
+  const clause = playerClauseDemand(p, wantYears);
+  return { salary: base, years: wantYears, clause };
+}
+
+function contractAcceptance(p, offeredSal, offeredYrs){
+  const ask = playerAsk(p);
+  // Trait modifies how picky the player is
+  const traitMod = traitContractMod(p);
+  const adjustedAsk = ask.salary * traitMod;
+  const salRatio = offeredSal / adjustedAsk;
+  const yrDiff = offeredYrs - ask.years;
+  const will = traitFAWillingness(p, state.myTeam);
+  // Mercenary/Greedy harder to please, Loyal easier
+  const threshold = will > 1.2 ? 1.05 : will < 0.8 ? 0.85 : 0.95;
+  if(salRatio >= threshold && yrDiff >= -1) return { accepts: true, mood: '😄 Happy to sign!' };
+  if(salRatio >= threshold-0.15 && yrDiff >= -2) return { accepts: true, mood: '🤝 Accepts the offer.' };
+  if(salRatio >= threshold-0.25 && yrDiff >= -1) return { accepts: Math.random()<0.5*will, mood: '😐 Considering...' };
+  return { accepts: false, mood: '❌ Wants more.' };
+}
