@@ -2822,36 +2822,9 @@ function assignGoalsToTeam(team, goals, isMyTeam, mg, og){
     }
   }
 
-  // B. Handle Goalie (GP, Saves, W/L)
+// B. Handle Goalie (GP, Saves, W/L)
   if(goalies.length){
-    // Determine which goalie plays (75% starter, 25% backup)
-    const useStarter = Math.random() * 100 < (league.starterSharePct || 75);
-    const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
-    
-    const saves = rnd(18, 35);
-    const s = getStatLine(goalie);
-    
-    s.ga += goals;
-    s.saves += saves;
-    s.sa += goals + saves;
-    s.gp = (s.gp || 0) + 1; // THE ONLY GP ADDITION
-
-    // Win/Loss logic
-    const teamWon = (isMyTeam && mg > og) || (!isMyTeam && og > mg);
-    if(teamWon) s.w = (s.w||0)+1; else s.l = (s.l||0)+1;
-  }
-}
-
-function assignPlusMinus(team, goalsFor, goalsAgainst){
-  // Top 6 forwards and top 4 D roughly track +/-
-  const skaters = [...team.roster].filter(p=>p.pos!=='G')
-    .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
-  skaters.forEach(p=>{
-    getStatLine(p).pm += goalsFor - goalsAgainst;
-  });
-}
-// Goalie stats inside assignGoalsToTeam
-  if(goalies.length){
+    // Use 65-75% for a realistic starter/backup split
     const useStarter = Math.random() * 100 < (league.starterSharePct || 65);
     const goalie = (useStarter || goalies.length === 1) ? goalies[0] : goalies[1];
     
@@ -2861,13 +2834,22 @@ function assignPlusMinus(team, goalsFor, goalsAgainst){
     s.ga += goals;
     s.saves += saves;
     s.sa += goals + saves;
-    s.gp = (s.gp || 0) + 1; // This is now the ONLY +1 GP for goalies
+    s.gp = (s.gp || 0) + 1; // Correct: Only 1 GP per game
 
-    // Add Win/Loss logic here:
-    // If it's my team and we scored more than the opponent, it's a win
+    // Win/Loss logic based on final score
     const teamWon = (isMyTeam && mg > og) || (!isMyTeam && og > mg);
     if(teamWon) s.w = (s.w||0)+1; else s.l = (s.l||0)+1;
   }
+} // This curly brace closes the assignGoalsToTeam function
+
+function assignPlusMinus(team, goalsFor, goalsAgainst){
+  // Top 6 forwards and top 4 D track +/-
+  const skaters = [...team.roster].filter(p=>p.pos!=='G')
+    .sort((a,b)=>b.ovr-a.ovr).slice(0,10);
+  skaters.forEach(p=>{
+    getStatLine(p).pm += (goalsFor - goalsAgainst);
+  });
+}
 
 function weightedPick(players, attr){
   if(!players.length) return null;
