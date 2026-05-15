@@ -1949,6 +1949,17 @@ function showSettings(){
   document.getElementById('modal-settings').classList.add('open');
 }
 
+function closeModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) {
+    modal.classList.remove('open');
+    // This ensures that if the modal used a 'display: flex' style, it hides properly
+    if (modal.style.display === 'flex') {
+      modal.style.display = 'none';
+    }
+  }
+}
+
 // ---- Menu Navigation ----
 function showMenu(){
   document.getElementById('screen-menu').classList.add('active');
