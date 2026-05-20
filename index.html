@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ice Office — Hockey GM</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- MAIN MENU -->
+<div id="screen-menu" class="active">
+  <div class="rink-lines"></div>
+  <div style="position:relative;z-index:1;width:100%;max-width:500px;padding:40px 20px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:16px;">🏒</div>
+    <div class="menu-title">Hockey<br><span>GM</span></div>
+    <div class="menu-subtitle">General Manager Simulator</div>
+    <div style="margin-top:48px;">
+      <button class="menu-btn menu-btn-primary" onclick="showTeamSelect()">▶ Start New Game</button>
+      <button class="menu-btn menu-btn-secondary" onclick="openSaveSlotMenu()">📂 Load Game</button>
+      <button class="menu-btn menu-btn-secondary" onclick="showSettings()">⚙️ Settings</button>
+    </div>
+    <div style="margin-top:48px;font-size:11px;color:var(--text2);letter-spacing:1px;">v0.1 · Early Access</div>
+  </div>
+</div>
+
+<!-- SETTINGS (main menu) -->
+<div class="modal-overlay" id="modal-settings">
+  <div class="modal" style="width:700px; max-width:96vw; max-height:85vh; overflow-y:auto;">
+    <h2>Display &amp; Fonts</h2>
+    <p style="font-size:13px; color:var(--text2); margin-bottom:14px; line-height:1.45;">
+      These colors control most text in the game. Changes apply immediately and are saved in this browser.
+    </p>
+
+    <div class="theme-color-row">
+      <label for="theme-color-text">Main text</label>
+      <input type="color" id="theme-color-text" title="Body and primary UI text">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-text2">Muted text</label>
+      <input type="color" id="theme-color-text2" title="Labels, subtitles, secondary lines">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-accent">Accent &amp; links</label>
+      <input type="color" id="theme-color-accent" title="Highlights, GM title accent, borders tint">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-ice">Bright text</label>
+      <input type="color" id="theme-color-ice" title="Active tabs, nav highlights, emphasis">
+    </div>
+    <div class="theme-color-row">
+      <label for="theme-color-ice2">Soft bright text</label>
+      <input type="color" id="theme-color-ice2" title="Alternate highlights">
+    </div>
+
+    <div class="theme-sample">
+      <span style="color:var(--text);font-weight:600;">Sample body</span>
+      <span style="color:var(--text2);"> · muted</span>
+      <span style="color:var(--accent);"> · accent</span>
+      <span style="color:var(--ice);"> · bright</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">Goalie Workload Split</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:12px;">How many games the starting goalie plays vs the backup. NHL average is around 60–65%.</p>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <input type="range" id="goalie-split-slider" min="50" max="85" step="1"
+        value="65"
+        oninput="updateGoalieSplit(this.value)"
+        style="flex:1;">
+      <span id="goalie-split-label" style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;min-width:80px;">65% / 35%</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);">
+      Starter plays ~<span id="goalie-split-games">53</span> of 82 games · Backup plays ~<span id="goalie-split-backup-games">29</span>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">OVR Tier Colors &amp; Labels</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Customize the color and name shown for each overall rating range.</p>
+    <div id="ovr-tier-editor"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" class="btn" onclick="resetOvrTiers()">Reset OVR defaults</button>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
+    <h3 style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;margin-bottom:6px;">Save Management</h3>
+    <div id="settings-save-info" style="font-size:13px;color:var(--text2);margin-bottom:12px;">—</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-primary" onclick="openSaveSlotMenu('save')">💾 Save Game</button>
+      <button type="button" class="btn" onclick="confirmLoadFromSettings()">📂 Load Save</button>
+    </div>
+
+    <div class="modal-actions" style="margin-top:18px;flex-wrap:wrap;">
+      <button type="button" class="btn" onclick="resetThemeColors()">Reset theme</button>
+      <button type="button" class="btn btn-primary" onclick="closeModal('modal-settings')">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM SELECTION -->
+<div id="screen-teamsel">
+  <div class="rink-lines"></div>
+  <div style="position:relative;z-index:1;width:100%;max-width:1200px;margin:0;padding:32px 20px 60px;">
+    <button onclick="showMenu()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;margin-bottom:24px;">← Back</button>
+    <div class="menu-title" style="font-size:36px;text-align:left;margin-bottom:4px;">Select Your <span>Team</span></div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:24px;">Choose the franchise you'll manage. Each team has a different philosophy and identity.</div>
+
+    <div id="teamsel-main" style="display:flex; gap:20px; align-items:flex-start;">
+      <div id="teamsel-preview" class="teamsel-preview" style="position:relative;overflow:hidden;">
+        <!-- faded team logo watermark -->
+        <div id="teamsel-logo-bg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;opacity:0;transition:opacity 0.3s;">
+          <div id="teamsel-logo-text" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:220px;color:rgba(255,255,255,0.045);line-height:1;user-select:none;letter-spacing:-4px;"></div>
+        </div>
+        <div style="position:relative;z-index:1;">
+        <div class="stat-grid" id="teamsel-statgrid">
+          <div class="stat-card"><div class="stat-card-label">Team Overall</div><div class="stat-card-val" id="teamsel-ovr">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Forward Overall</div><div class="stat-card-val" id="teamsel-fwd">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Defense Overall</div><div class="stat-card-val" id="teamsel-def">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Goalie Overall</div><div class="stat-card-val" id="teamsel-goal">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Roster Size</div><div class="stat-card-val" id="teamsel-roster-size">—</div></div>
+          <div class="stat-card"><div class="stat-card-label">Average Age</div><div class="stat-card-val" id="teamsel-avg-age">—</div></div>
+        </div>
+        <div style="margin-top:18px;">
+          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Roster Preview</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Player</th>
+                  <th>Pos</th>
+                  <th>Age</th>
+                  <th>OVR</th>
+                  <th>Salary</th>
+                </tr>
+              </thead>
+              <tbody id="teamsel-roster"></tbody>
+            </table>
+          </div>
+        </div>
+        </div><!-- end z-index:1 content -->
+      </div><!-- end teamsel-preview -->
+
+      <div id="teamsel-grid"></div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:16px;position:sticky;bottom:20px;background:var(--rink);padding:16px 0;border-top:1px solid var(--border);">
+      <div id="teamsel-info" style="flex:1;font-size:13px;color:var(--text2);">No team selected</div>
+      <button id="teamsel-confirm" class="menu-btn menu-btn-primary" style="width:auto;padding:12px 32px;opacity:0.4;pointer-events:none;" onclick="confirmTeamSelect()">Start as GM →</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <!-- faded team logo watermark for game screen -->
+  <div id="game-logo-bg" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;">
+    <div id="game-logo-text" style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:380px;color:rgba(255,255,255,0.025);line-height:1;user-select:none;letter-spacing:-8px;">IW</div>
+  </div>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="team-logo" id="hdr-logo">IW</div>
+      <div class="team-info">
+        <h1 id="hdr-name">—</h1>
+        <div class="sub" id="hdr-sub">Season <span id="hdr-season">1</span> · General Manager</div>
+      </div>
+    </div>
+    <div class="header-stats">
+      <div class="hstat"><div class="hstat-val" id="hdr-record">0-0-0</div><div class="hstat-label">Record</div></div>
+      <div class="hstat"><div class="hstat-val" id="hdr-pts">0</div><div class="hstat-label">Points</div></div>
+      <div class="hstat"><div class="hstat-val" id="hdr-week">Wk 1</div><div class="hstat-label">Week</div></div>
+    </div>
+    <div class="header-actions">
+      <button class="btn" onclick="openSaveSlotMenu('save')" style="font-size:12px;padding:6px 12px;">💾 Save</button>
+      <button class="btn" onclick="showPauseMenu()">⏸️ Pause</button>
+      <button class="btn" onclick="simDay()">▶ Sim Day</button>
+      <button class="btn" onclick="simWeek()">▶▶ Sim Week</button>
+      <button class="btn" onclick="simToTradeDeadline()">⏩ Sim to Deadline</button>
+      <button class="btn btn-red" onclick="simSeason()">⏭ Sim Season</button>
+      <button class="btn btn-gold" id="autosim-btn" onclick="toggleAutoSim()">▶▶ Auto-Sim</button>
+    </div>
+  </header>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-card-label">Cap Space</div>
+      <div class="stat-card-val" id="sc-cap">$42.0M</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Team OVR</div>
+      <div class="stat-card-val" id="sc-ovr">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Roster Size</div>
+      <div class="stat-card-val" id="sc-roster">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Morale</div>
+      <div class="stat-card-val" id="sc-morale">😐</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-label">Standing</div>
+      <div class="stat-card-val" id="sc-standing">—</div>
+    </div>
+  </div>
+
+  <!-- NAV BAR -->
+  <div class="nav-bar">
+    <button class="nav-group-btn active" id="navg-team" onclick="showNavGroup('team')">🏒 Team</button>
+    <button class="nav-group-btn" id="navg-league" onclick="showNavGroup('league')">🌍 League</button>
+    <button class="nav-group-btn" id="navg-transactions" onclick="showNavGroup('transactions')">🔄 Transactions</button>
+    <button class="nav-group-btn" id="navg-management" onclick="showNavGroup('management')">🧠 Management</button>
+  </div>
+
+  <!-- TEAM SUBMENU -->
+  <div class="nav-submenu active" id="sub-team">
+    <button class="nav-sub-btn active" id="subbtn-roster" onclick="showTab('roster')">Roster</button>
+    <button class="nav-sub-btn" id="subbtn-lines" onclick="showTab('lines')">Lines</button>
+    <button class="nav-sub-btn" id="subbtn-affiliates" onclick="showTab('affiliates')">Affiliates</button>
+    <button class="nav-sub-btn" id="subbtn-contracts" onclick="showTab('contracts')">Contracts</button>
+    <button class="nav-sub-btn" id="subbtn-log" onclick="showTab('log')">Game Log</button>
+  </div>
+
+  <!-- LEAGUE SUBMENU -->
+  <div class="nav-submenu" id="sub-league">
+    <button class="nav-sub-btn" id="subbtn-standings" onclick="showTab('standings')">Standings</button>
+    <button class="nav-sub-btn" id="subbtn-playoffs" onclick="showTab('playoffs')">Playoffs</button>
+    <button class="nav-sub-btn" id="subbtn-power" onclick="showTab('power')">Power Rankings</button>
+    <button class="nav-sub-btn" id="subbtn-calendar" onclick="showTab('calendar')">📅 Calendar</button>
+    <button class="nav-sub-btn" id="subbtn-leaders" onclick="showTab('leaders')">League Leaders</button>
+  </div>
+
+  <!-- TRANSACTIONS SUBMENU -->
+  <div class="nav-submenu" id="sub-transactions">
+    <button class="nav-sub-btn" id="subbtn-fa" onclick="showTab('fa')">Free Agents</button>
+    <button class="nav-sub-btn" id="subbtn-trade" onclick="showTab('trade')">Trade Center</button>
+    <button class="nav-sub-btn offseason-only" id="subbtn-resign" onclick="showTab('resign')">Re-Sign</button>
+    <button class="nav-sub-btn offseason-only" id="subbtn-draft" onclick="showTab('draft')">Draft</button>
+    <button class="nav-sub-btn" id="subbtn-waivers" onclick="showTab('waivers')">Waivers</button>
+  </div>
+
+  <!-- MANAGEMENT SUBMENU -->
+  <div class="nav-submenu" id="sub-management">
+    <button class="nav-sub-btn future" title="Coming soon">Staff</button>
+    <button class="nav-sub-btn future" title="Coming soon">Finances</button>
+    <button class="nav-sub-btn future" title="Coming soon">Team Strategy</button>
+    <button class="nav-sub-btn" onclick="showTab('settings')">Settings</button>
+  </div>
+
+  <!-- ROSTER -->
+  <div id="panel-roster" class="tab-panel active">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th onclick="sortRoster('name')" style="cursor:pointer;">Player <span id="sort-roster-name"></span></th>
+            <th onclick="sortRoster('pos')" style="cursor:pointer;">Pos <span id="sort-roster-pos">↕</span></th>
+            <th onclick="sortRoster('age')" style="cursor:pointer;">Age <span id="sort-roster-age"></span></th>
+            <th onclick="sortRoster('ovr')" style="cursor:pointer;">OVR <span id="sort-roster-ovr"></span></th>
+            <th>Projection</th>
+            <th onclick="sortRoster('salary')" style="cursor:pointer;">Salary <span id="sort-roster-salary"></span></th>
+            <th onclick="sortRoster('years')" style="cursor:pointer;">Yrs Left <span id="sort-roster-years"></span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="roster-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FA -->
+  <div id="panel-fa" class="tab-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 4px 8px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:13px;color:var(--text2);">
+        <span id="fa-count" style="font-size:18px;font-weight:700;color:#fff;font-family:'Barlow Condensed',sans-serif;">0</span>
+        <span style="margin-left:6px;">players available</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input id="fa-search" type="text" placeholder="Name…" oninput="faFilterChanged()"
+          style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:#fff;font-size:13px;width:120px;outline:none;">
+        <input id="fa-pos-filter" type="text" placeholder="Pos (C, LW…)" oninput="faFilterChanged()"
+          style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:#fff;font-size:13px;width:110px;outline:none;">
+        <input id="fa-ovr-filter" type="text" placeholder="OVR (e.g. 76-80)" oninput="faFilterChanged()"
+          style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:#fff;font-size:13px;width:120px;outline:none;">
+        <input id="fa-age-filter" type="text" placeholder="Age (e.g. 22-27)" oninput="faFilterChanged()"
+          style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:#fff;font-size:13px;width:120px;outline:none;">
+        <input id="fa-pot-filter" type="text" placeholder="Pot (A, B, C)" oninput="faFilterChanged()"
+          style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:#fff;font-size:13px;width:110px;outline:none;">
+        <button onclick="['fa-search','fa-pos-filter','fa-ovr-filter','fa-age-filter','fa-pot-filter'].forEach(id=>document.getElementById(id).value='');faFilterChanged();"
+          style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--text2);font-size:12px;cursor:pointer;">✕ Clear</button>
+      </div>
+    </div>
+    <!-- FA Signing Log -->
+    <div id="fa-signing-log" style="display:none;margin-bottom:14px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;max-height:160px;overflow-y:auto;">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Recent Signings</div>
+      <div id="fa-signing-log-entries" style="font-size:12px;line-height:1.9;"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortFA('name')" style="cursor:pointer;">Player <span id="sort-fa-name"></span></th>
+            <th onclick="sortFA('pos')" style="cursor:pointer;">Pos <span id="sort-fa-pos"></span></th>
+            <th onclick="sortFA('age')" style="cursor:pointer;">Age <span id="sort-fa-age"></span></th>
+            <th onclick="sortFA('ovr')" style="cursor:pointer;">OVR <span id="sort-fa-ovr">↓</span></th>
+            <th>Projection</th>
+            <th onclick="sortFA('salary')" style="cursor:pointer;">Asking <span id="sort-fa-salary"></span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fa-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TRADE -->
+  <div id="panel-trade" class="tab-panel">
+    <!-- CPU trade activity log — shown above the trade builder -->
+    <div id="cpu-trade-log" style="display:none;margin-bottom:16px;background:var(--rink2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;max-height:180px;overflow-y:auto;">
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">📦 League Trade Activity</div>
+      <div id="cpu-trade-log-entries" style="font-size:12px;line-height:1.9;"></div>
+    </div>
+    <div id="trade-body"></div>
+  </div>
+
+  <!-- STANDINGS -->
+  <div id="panel-standings" class="tab-panel">
+    <div id="standings-body"></div>
+  </div>
+
+  <!-- PLAYOFFS -->
+  <div id="panel-playoffs" class="tab-panel">
+    <div id="playoffs-body"></div>
+  </div>
+
+  <!-- POWER RANKINGS -->
+  <div id="panel-power" class="tab-panel">
+    <div id="power-body"></div>
+  </div>
+
+  <!-- LEAGUE LEADERS -->
+  <div id="panel-leaders" class="tab-panel">
+    <div id="leaders-body"></div>
+  </div>
+
+  <!-- RE-SIGN -->
+  <div id="panel-resign" class="tab-panel">
+    <div id="resign-body"></div>
+  </div>
+
+  <!-- DRAFT -->
+  <div id="panel-draft" class="tab-panel">
+    <div id="draft-body"></div>
+  </div>
+
+  <!-- LINES -->
+  <div id="panel-lines" class="tab-panel">
+    <div id="lines-body"></div>
+  </div>
+
+  <!-- CONTRACTS -->
+  <div id="panel-contracts" class="tab-panel">
+    <div id="contracts-body"></div>
+  </div>
+
+  <!-- AFFILIATES -->
+  <div id="panel-affiliates" class="tab-panel">
+    <div id="affiliates-body"></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div id="panel-calendar" class="tab-panel">
+    <div id="calendar-body"></div>
+  </div>
+
+  <!-- LOG -->
+  <div id="panel-log" class="tab-panel">
+    <div class="log-area" id="game-log">
+      <div style="color:var(--text2);font-size:13px;">No games simulated yet. Hit Sim Week to get started.</div>
+    </div>
+  </div>
+
+  <!-- WAIVERS -->
+  <div id="panel-waivers" class="tab-panel">
+    <div id="waivers-body"></div>
+  </div>
+
+  <!-- SETTINGS PANEL -->
+  <div id="panel-settings" class="tab-panel">
+    <div style="max-width:620px;padding:4px 0;">
+
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:4px;">Auto-Sim</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:24px;">Configure how the game automatically simulates days. Hit the Auto-Sim button in the calendar to start.</p>
+
+      <!-- Speed -->
+      <div style="margin-bottom:24px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;color:var(--ice);">Sim Speed</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn autosim-speed-btn" data-speed="1000" onclick="setAutoSimSpeed(1000)">🐢 Slow <span style="font-size:11px;color:var(--text2);">(1s/day)</span></button>
+          <button class="btn autosim-speed-btn active-speed" data-speed="400" onclick="setAutoSimSpeed(400)">⚡ Normal <span style="font-size:11px;color:var(--text2);">(0.4s/day)</span></button>
+          <button class="btn autosim-speed-btn" data-speed="150" onclick="setAutoSimSpeed(150)">🚀 Fast <span style="font-size:11px;color:var(--text2);">(0.15s/day)</span></button>
+          <button class="btn autosim-speed-btn" data-speed="40" onclick="setAutoSimSpeed(40)">⚡⚡ Turbo <span style="font-size:11px;color:var(--text2);">(40ms/day)</span></button>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin-bottom:24px;">
+
+      <!-- Auto-stop triggers -->
+      <div style="margin-bottom:24px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;color:var(--ice);">Auto-Stop Triggers</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">The sim will automatically pause when any enabled trigger is hit.</p>
+
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="autosim-stop-trade" checked style="width:16px;height:16px;accent-color:var(--gold);">
+            <div>
+              <div style="font-size:13px;font-weight:600;">Incoming Trade Offer</div>
+              <div style="font-size:11px;color:var(--text2);">Pauses when a CPU team sends you a trade proposal</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="autosim-stop-deadline" checked style="width:16px;height:16px;accent-color:var(--gold);">
+            <div>
+              <div style="font-size:13px;font-weight:600;">Trade Deadline</div>
+              <div style="font-size:11px;color:var(--text2);">Pauses when the trade deadline arrives</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="autosim-stop-season-end" checked style="width:16px;height:16px;accent-color:var(--gold);">
+            <div>
+              <div style="font-size:13px;font-weight:600;">Regular Season End</div>
+              <div style="font-size:11px;color:var(--text2);">Pauses when the regular season concludes</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="autosim-stop-playoffs" checked style="width:16px;height:16px;accent-color:var(--gold);">
+            <div>
+              <div style="font-size:13px;font-weight:600;">Playoff Series End</div>
+              <div style="font-size:11px;color:var(--text2);">Pauses after each playoff series your team is involved in</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="autosim-stop-draft" checked style="width:16px;height:16px;accent-color:var(--gold);">
+            <div>
+              <div style="font-size:13px;font-weight:600;">Draft Day</div>
+              <div style="font-size:11px;color:var(--text2);">Pauses when the Entry Draft begins</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;">
+            <input type="checkbox" id="autosim-stop-waiver-claim" checked style="width:16px;height:16px;accent-color:var(--gold);">
+            <div>
+              <div style="font-size:13px;font-weight:600;">Waiver Claim on Your Player</div>
+              <div style="font-size:11px;color:var(--text2);">Pauses when a CPU team claims one of your players off waivers</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin-bottom:24px;">
+
+      <!-- Sim-To target -->
+      <div style="margin-bottom:24px;">
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;color:var(--ice);">Sim-To Target</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px;">Optionally pick a checkpoint — auto-sim will stop when it reaches it regardless of other triggers.</p>
+        <select id="autosim-target" style="background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:13px;width:100%;max-width:320px;">
+          <option value="">— No specific target —</option>
+          <option value="season-start">Season Start (Oct 2)</option>
+          <option value="deadline">Trade Deadline</option>
+          <option value="season-end">Regular Season End</option>
+          <option value="playoffs-end">Playoff Series End</option>
+          <option value="draft">Draft Day</option>
+        </select>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- CONTRACT NEGOTIATION MODAL — used for both sign and extend -->
+<div class="modal-overlay" id="modal-sign">
+  <div class="modal" style="width:500px;max-height:90vh;overflow-y:auto;">
+    <h2 id="contract-title">Contract Negotiation</h2>
+    <div id="sign-info" style="font-size:13px;color:var(--text2);margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);"></div>
+
+    <!-- Player asking -->
+    <div style="background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.25);border-radius:6px;padding:10px 12px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Player Asking</div>
+      <div id="contract-asking" style="font-size:14px;font-weight:600;color:var(--text);"></div>
+    </div>
+
+    <!-- Competing offers from other teams — shown when CPU teams are also bidding -->
+    <div id="sign-competing-offers" style="display:none;background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.3);border-radius:6px;padding:10px 12px;margin-bottom:14px;"></div>
+
+    <!-- Your offer inputs -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Years</label>
+        <input type="number" id="sign-years" min="1" max="8" value="3" step="1"
+          oninput="updateContractPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Max: <span id="sign-years-max">8</span> yrs</div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Annual Salary ($M)</label>
+        <input type="number" id="sign-salary" min="0.775" max="14.7" value="3" step="0.025"
+          oninput="updateContractPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Cap: <span id="sign-cap-pct">—</span>%</div>
+      </div>
+    </div>
+
+    <!-- Year-by-year breakdown table -->
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;">Year-by-Year Breakdown</span>
+        <span style="font-size:13px;font-weight:700;color:var(--gold);">Total: <span id="contract-total">—</span></span>
+      </div>
+      <div id="contract-year-breakdown" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Clause selector -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Include Clause (Optional)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="setSignClause(null)" id="sign-clause-none" class="btn btn-sm" style="border-color:var(--accent);color:var(--ice);">None</button>
+        <button onclick="setSignClause('NMC')" id="sign-clause-NMC" class="btn btn-sm">🔴 NMC</button>
+        <button onclick="setSignClause('M-NMC')" id="sign-clause-M-NMC" class="btn btn-sm">🟡 M-NMC</button>
+        <button onclick="setSignClause('NTC')" id="sign-clause-NTC" class="btn btn-sm">🔵 NTC</button>
+      </div>
+      <div id="sign-clause-desc" style="font-size:11px;color:var(--text2);margin-top:5px;"></div>
+    </div>
+
+    <!-- Two-Way Contract toggle -->
+    <div id="sign-twoway-section" style="margin-bottom:14px;background:rgba(41,128,185,0.07);border:1px solid rgba(41,128,185,0.25);border-radius:6px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div>
+          <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.8px;">Two-Way Contract</span>
+          <span style="font-size:11px;color:var(--text2);margin-left:8px;">— lower cap hit when in minors</span>
+        </div>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin:0;">
+          <span style="font-size:12px;color:var(--text2);">Off</span>
+          <div style="position:relative;width:38px;height:20px;" onclick="event.preventDefault();event.stopPropagation();var cb=document.getElementById('sign-twoway-toggle');cb.checked=!cb.checked;updateSignTwoWay();">
+            <input type="checkbox" id="sign-twoway-toggle" style="opacity:0;width:0;height:0;position:absolute;">
+            <div id="sign-twoway-track" style="position:absolute;inset:0;background:rgba(255,255,255,0.12);border-radius:10px;cursor:pointer;transition:background 0.2s;"></div>
+            <div id="sign-twoway-thumb" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:left 0.2s;pointer-events:none;"></div>
+          </div>
+          <span style="font-size:12px;color:var(--text2);">On</span>
+        </label>
+      </div>
+      <div id="sign-twoway-inputs" style="display:none;margin-top:8px;">
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:5px;">Minor League Salary ($M) <span style="font-weight:400;text-transform:none;letter-spacing:0;">(counts vs cap only while in NHL)</span></label>
+        <input type="number" id="sign-minor-salary" min="0.075" max="0.775" value="0.375" step="0.025"
+          oninput="updateContractPreview()"
+          style="width:160px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;padding:7px 10px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">When assigned to AHL/ECHL, cap hit drops to this amount. While on NHL roster, full salary counts.</div>
+      </div>
+    </div>
+
+    <!-- Cap & reaction -->
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+      <span style="color:var(--text2);">Cap space after signing</span>
+      <span id="contract-cap-left" style="font-weight:600;"></span>
+    </div>
+    <div id="contract-reaction" style="font-size:13px;min-height:22px;font-weight:600;text-align:center;padding:6px;border-radius:4px;"></div>
+    <div id="sign-warn" class="warn-text" style="text-align:center;margin-top:4px;"></div>
+
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('modal-sign')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmSign()">Make Offer</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXTEND MODAL — same layout -->
+<div class="modal-overlay" id="modal-extend">
+  <div class="modal" style="width:500px;max-height:90vh;overflow-y:auto;">
+    <h2>Extend Contract</h2>
+    <div id="extend-info" style="font-size:13px;color:var(--text2);margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);"></div>
+
+    <div style="background:rgba(243,156,18,0.08);border:1px solid rgba(243,156,18,0.25);border-radius:6px;padding:10px 12px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Player Asking</div>
+      <div id="extend-asking" style="font-size:14px;font-weight:600;color:var(--text);"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Years to Add</label>
+        <input type="number" id="extend-years" min="1" max="8" value="3" step="1"
+          oninput="updateExtendPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Added on top of current</div>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Annual Salary ($M)</label>
+        <input type="number" id="extend-salary" min="0.775" max="14.7" value="3" step="0.025"
+          oninput="updateExtendPreview()"
+          style="width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;padding:10px 12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:3px;">Cap: <span id="extend-cap-pct">—</span>%</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;">
+      <div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;">Year-by-Year Breakdown</span>
+        <span style="font-size:13px;font-weight:700;color:var(--gold);">Total: <span id="extend-total">—</span></span>
+      </div>
+      <div id="extend-year-breakdown" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Clause selector -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:6px;">Include Clause (Optional)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="setExtendClause(null)" id="extend-clause-none" class="btn btn-sm" style="border-color:var(--accent);color:var(--ice);">None</button>
+        <button onclick="setExtendClause('NMC')" id="extend-clause-NMC" class="btn btn-sm">🔴 NMC</button>
+        <button onclick="setExtendClause('M-NMC')" id="extend-clause-M-NMC" class="btn btn-sm">🟡 M-NMC</button>
+        <button onclick="setExtendClause('NTC')" id="extend-clause-NTC" class="btn btn-sm">🔵 NTC</button>
+      </div>
+      <div id="extend-clause-desc" style="font-size:11px;color:var(--text2);margin-top:5px;"></div>
+    </div>
+
+    <!-- Two-Way Contract toggle (Extend) -->
+    <div id="extend-twoway-section" style="margin-bottom:14px;background:rgba(41,128,185,0.07);border:1px solid rgba(41,128,185,0.25);border-radius:6px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div>
+          <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.8px;">Two-Way Contract</span>
+          <span style="font-size:11px;color:var(--text2);margin-left:8px;">— lower cap hit when in minors</span>
+        </div>
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;margin:0;">
+          <span style="font-size:12px;color:var(--text2);">Off</span>
+          <div style="position:relative;width:38px;height:20px;" onclick="event.preventDefault();event.stopPropagation();var cb=document.getElementById('extend-twoway-toggle');cb.checked=!cb.checked;updateExtendTwoWay();">
+            <input type="checkbox" id="extend-twoway-toggle" style="opacity:0;width:0;height:0;position:absolute;">
+            <div id="extend-twoway-track" style="position:absolute;inset:0;background:rgba(255,255,255,0.12);border-radius:10px;cursor:pointer;transition:background 0.2s;"></div>
+            <div id="extend-twoway-thumb" style="position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:left 0.2s;pointer-events:none;"></div>
+          </div>
+          <span style="font-size:12px;color:var(--text2);">On</span>
+        </label>
+      </div>
+      <div id="extend-twoway-inputs" style="display:none;margin-top:8px;">
+        <label style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:5px;">Minor League Salary ($M)</label>
+        <input type="number" id="extend-minor-salary" min="0.075" max="0.775" value="0.375" step="0.025"
+          oninput="updateExtendPreview()"
+          style="width:160px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;padding:7px 10px;text-align:center;">
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">While on NHL roster, full salary counts against cap.</div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;">
+      <span style="color:var(--text2);">Cap space after extension</span>
+      <span id="extend-cap-left" style="font-weight:600;"></span>
+    </div>
+    <div id="extend-reaction" style="font-size:13px;min-height:22px;font-weight:600;text-align:center;padding:6px;border-radius:4px;"></div>
+    <div id="extend-warn" class="warn-text" style="text-align:center;margin-top:4px;"></div>
+
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('modal-extend')">Cancel</button>
+      <button class="btn btn-primary" style="background:var(--accent);border-color:var(--accent);" onclick="confirmExtend()">Offer Extension</button>
+    </div>
+  </div>
+</div>
+
+<!-- RELEASE MODAL -->
+<div class="modal-overlay" id="modal-release">
+  <div class="modal">
+    <h2>Release Player</h2>
+    <div id="release-info" style="font-size:14px;margin-bottom:8px;"></div>
+    <p style="font-size:13px;color:var(--text2);">Releasing this player clears their cap space. They will enter free agency.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-release')">Cancel</button>
+      <button class="btn btn-red" onclick="confirmRelease()">Release</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAUSE MENU MODAL -->
+<div class="modal-overlay" id="modal-pause">
+  <div class="modal">
+    <h2>Game Paused</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">What would you like to do?</p>
+    <div class="modal-actions" style="flex-direction:column;gap:10px;align-items:stretch;">
+      <button class="btn btn-primary" onclick="closeModal('modal-pause')" style="text-align:center;">▶ Resume Game</button>
+      <button class="btn" onclick="openSaveSlotMenu('save')" style="text-align:center;">💾 Save Game</button>
+      <button class="btn" onclick="closeModal('modal-pause');showSettings();" style="text-align:center;">⚙️ Settings</button>
+      <button class="btn" onclick="quitToMainMenu()" style="text-align:center;color:var(--red2);">Quit to Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEAM ROSTER (scouting from Power Rankings, etc.) -->
+<div class="modal-overlay" id="modal-team-roster">
+  <div class="modal" style="width:720px;max-width:96vw;max-height:90vh;overflow-y:auto;">
+    <h2 id="modal-team-roster-title">Team Roster</h2>
+    <p id="modal-team-roster-sub" style="font-size:13px;color:var(--text2);margin-bottom:12px;"></p>
+    <div id="modal-team-roster-body"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn" onclick="closeModal('modal-team-roster')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYER PAGE -->
+<div id="player-page" style="display:none;position:fixed;inset:0;background:var(--rink);z-index:200;overflow-y:auto;">
+  <div style="max-width:1400px;margin:0 auto;padding:20px 24px 40px;">
+    <button onclick="closePlayerPage()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;margin-bottom:20px;">← Back to Roster</button>
+    <div id="player-page-content"></div>
+  </div>
+</div>
+
+<!-- RETIREMENT MODAL -->
+<div class="modal-overlay" id="modal-retirements">
+  <div class="modal" style="width:560px;max-height:80vh;overflow-y:auto;">
+    <h2>🏁 Retirements</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">The following players have hung up their skates this offseason.</p>
+    <div id="retirements-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('modal-retirements');showTab('draft');">Continue to Draft →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FLASH -->
+<div class="flash" id="flash">
+  <div class="flash-title" id="flash-title"></div>
+  <div id="flash-body" style="font-size:13px;color:var(--text2);margin-top:2px;"></div>
+</div>
+
+<!-- SAVE SLOT MODAL (main menu) -->
+<div class="modal-overlay" id="modal-save-slot">
+  <div class="modal" style="width:480px;max-width:96vw;">
+    <h2>💾 Save File</h2>
+    <div id="save-slot-content" style="margin-bottom:18px;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-save-slot')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
