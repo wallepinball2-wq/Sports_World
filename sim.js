@@ -200,7 +200,7 @@ function processWeekGames(){
 }
 
 function showOffseasonTabs(){
-  document.querySelectorAll('.nav-sub-btn.offseason-only').forEach(b=>b.classList.add('visible'));
+  document.querySelectorAll('.sidebar-btn.offseason-only').forEach(b=>b.classList.add('visible'));
 }
 
 // ----------------------------------------------------------------
