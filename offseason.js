@@ -979,7 +979,7 @@ function startOffseason(){
   state.offseasonPhase = 'draft'; // draft -> resign -> fa -> done
 
   // Show offseason-only nav buttons
-  document.querySelectorAll('.nav-sub-btn.offseason-only').forEach(b=>b.classList.add('visible'));
+  document.querySelectorAll('.sidebar-btn.offseason-only').forEach(b=>b.classList.add('visible'));
   renderAll();
   if(state.retirements && state.retirements.length > 0){
     showRetirements();
